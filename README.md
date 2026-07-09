@@ -2,6 +2,8 @@
 
 PourSend is a local Windows desktop utility for organizing recipients, batch-importing phone numbers, and copying checked recipient numbers for use with RingCentral.
 
+Current release: `v2.0.0`
+
 The application does not send messages itself. You copy prepared recipient numbers from the app, paste them into RingCentral, and send manually.
 
 This is an independent, unofficial utility and is not affiliated with or endorsed by RingCentral.
@@ -9,7 +11,7 @@ This is an independent, unofficial utility and is not affiliated with or endorse
 ## Core Workflow
 
 ```text
-Open app -> Choose a group or recipients -> Select recipients -> Copy numbers -> Paste into RingCentral -> Send manually
+Open app -> Choose a group or recipients -> Check recipients -> Copy numbers -> Paste into RingCentral -> Send manually
 ```
 
 Batch import workflow:
@@ -17,6 +19,21 @@ Batch import workflow:
 ```text
 Copy many phone numbers -> Paste List -> Review preview -> Add All Recipients -> Select group -> Copy
 ```
+
+Common workflows:
+
+1. Add a phone number manually with **Add Recipient**.
+2. Paste copied text with **Paste List**.
+3. Import a TXT, CSV, or XLSX file with **Import File**.
+4. Drag and drop a TXT, CSV, or XLSX file into the app.
+5. Review the import preview before adding recipients.
+6. Organize recipients by group.
+7. Search and sort the current recipient list.
+8. Check recipients to include them in checked-recipient actions.
+9. Copy numbers for manual use in RingCentral.
+10. Export recipient data to TXT, CSV, or XLSX.
+11. Create and restore JSON backups.
+12. Undo the most recent successful import when needed.
 
 ## Features
 
@@ -127,8 +144,10 @@ python main.py
 This repository includes a manual GitHub Actions workflow that builds:
 
 ```text
-PourSend.exe
+PourSend-v2.0.0-Windows.zip
 ```
+
+The zip contains `PourSend.exe`, `README.md`, and `LICENSE`.
 
 To build it:
 
@@ -137,8 +156,9 @@ To build it:
 3. Select **Build PourSend Windows executable**.
 4. Click **Run workflow**.
 5. Run the workflow on `main`.
-6. When it finishes, download the `PourSend-Windows` artifact.
-7. Extract `PourSend.exe`.
+6. When it finishes, download the `PourSend-v2.0.0-Windows` artifact.
+7. Extract `PourSend-v2.0.0-Windows.zip`.
+8. Run `PourSend.exe`.
 
 This is a portable executable, not an official signed installer.
 
@@ -150,7 +170,7 @@ Run the automated test suite:
 python -m unittest
 ```
 
-The current suite has 112 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, and shortcut safety.
+The current suite has 113 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, shortcut safety, and release versioning.
 
 ## Data Location
 
