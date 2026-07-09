@@ -1,31 +1,93 @@
-# RingCentral Recipient Prep
+# RingCentralRecipientPrep
 
-A small local Windows desktop utility for preparing multiple recipient phone numbers for RingCentral.
+RingCentralRecipientPrep is a local Windows desktop utility for organizing recipients, batch-importing phone numbers, and copying selected recipient numbers for use with RingCentral.
 
-The app helps you maintain a local list of names and phone numbers, select recipients, clean and validate US phone numbers, remove duplicates, and copy the selected numbers to the clipboard. You then paste the numbers into RingCentral yourself.
+The application does not send messages itself. You copy prepared recipient numbers from the app, paste them into RingCentral, and send manually.
 
-This app never sends messages and does not connect to RingCentral.
+This is an independent, unofficial utility and is not affiliated with or endorsed by RingCentral.
 
-## Privacy
+## Core Workflow
 
-- Runs locally on your computer.
-- Stores recipients in a local JSON file only.
-- Makes no network requests.
-- Has no analytics or telemetry.
-- Does not sync contacts.
-- Does not automate RingCentral, browsers, clicking, typing, or sending.
+```text
+Open app -> Choose a group or recipients -> Select recipients -> Copy numbers -> Paste into RingCentral -> Send manually
+```
+
+Batch import workflow:
+
+```text
+Copy many phone numbers -> Paste List -> Review preview -> Add All Recipients -> Select group -> Copy
+```
 
 ## Features
 
-- Add, edit, delete, search, select all, and deselect all recipients.
-- Paste a list and preview what will be imported.
+- Add, edit, and delete recipients.
+- Search by name or phone number.
+- Organize recipients into groups.
+- Assign one recipient to multiple groups.
+- View `All Recipients`.
+- View `Unassigned` recipients.
+- Search within the currently selected group.
+- Select all visible recipients with `Select All in This Group`.
+- Deselect all visible recipients with `Deselect All in This Group`.
+- Import through `Paste List`.
+- Paste phone-only batches.
+- Paste name + phone rows.
 - Import CSV files with common name and phone column names.
-- Choose clipboard output format: comma-separated, semicolon-separated, or one number per line.
-- Normalize valid US numbers to `+1XXXXXXXXXX`.
-- Skip invalid numbers and remove duplicates during copy.
-- Export a JSON backup and clear all data with confirmation.
+- Assign a pasted batch to one or more existing groups.
+- Detect duplicates inside a pasted batch.
+- Detect phone numbers that already exist.
+- Detect invalid phone numbers before import.
+- Use `None` as the default name for unnamed imported numbers.
+- Save recipients and groups locally between launches.
+- Export a backup.
+- Clear all data with confirmation.
+- Normalize valid US phone numbers to `+1XXXXXXXXXX`.
+- Copy only checked recipients.
+- Remove duplicate numbers during copy.
+- Skip invalid numbers during copy.
+- Copy as comma-separated output.
+- Copy as semicolon-separated output.
+- Copy as one number per line.
 
-## Run From Source
+## Batch Import Behavior
+
+Each valid phone number in a pasted batch becomes a separate recipient.
+
+Unnamed numbers use `None` as the visible recipient name. You can rename those recipients later with the existing edit workflow.
+
+During preview and import:
+
+- Duplicate numbers inside the pasted batch are skipped.
+- Phone numbers that already exist in the recipient list are skipped.
+- Invalid phone numbers are skipped.
+- Existing recipients are never overwritten.
+- Existing names and group memberships are never silently modified.
+- Only newly added recipients receive optional batch group assignments.
+
+## Groups
+
+A recipient may belong to more than one group.
+
+Deleting a group does not delete the recipients inside it. It only removes that group membership.
+
+You can open a group, search within that group, then select or deselect only the visible recipients in that group.
+
+## Privacy
+
+RingCentralRecipientPrep is local-only.
+
+- All recipient data is stored locally.
+- The application makes no network requests.
+- No analytics are collected.
+- No telemetry is collected.
+- No cloud syncing is used.
+- No contact syncing is used.
+- There is no RingCentral API integration.
+- There is no automatic message sending.
+
+## Installation / Running From Source
+
+On Windows:
 
 ```powershell
 python -m venv .venv
@@ -34,24 +96,44 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Run Tests
+On macOS or Linux for development:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+## Portable Windows Build
+
+This repository includes a manual GitHub Actions workflow that builds:
+
+```text
+RingCentralRecipientPrep.exe
+```
+
+To build it:
+
+1. Open the repository on GitHub.
+2. Go to **Actions**.
+3. Select **Build Windows executable**.
+4. Click **Run workflow**.
+5. Run the workflow on `main`.
+6. When it finishes, download the `RingCentralRecipientPrep-Windows` artifact.
+7. Extract `RingCentralRecipientPrep.exe`.
+
+This is a portable executable, not an official signed installer.
+
+## Testing
+
+Run the automated test suite:
 
 ```powershell
 python -m unittest
 ```
 
-## Build A Portable Windows App
-
-From Windows, install PyInstaller in the virtual environment:
-
-```powershell
-pip install pyinstaller
-pyinstaller --noconfirm --onefile --windowed --name RingCentralRecipientPrep main.py
-```
-
-The portable executable will be created under `dist\RingCentralRecipientPrep.exe`.
-
-No administrator privileges or installer are required. Keep the executable in a normal writable folder so the app can save its local JSON data next to the app. If that folder is not writable, it falls back to a local user folder.
+The current suite has 37 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, and batch phone-number import.
 
 ## Data Location
 
