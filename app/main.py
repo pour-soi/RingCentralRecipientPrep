@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.dialogs import PasteListDialog, PersonDialog
+from app.dialogs import ImportPreviewDialog, PasteListDialog, PersonDialog
 from app.storage import load_recipient_data, make_export_data, save_recipient_data
 from core.groups import (
     ALL_RECIPIENTS,
@@ -33,6 +33,7 @@ from core.groups import (
     create_group,
     DEFAULT_GROUP,
     delete_group,
+    find_recipient_index_by_phone,
     filtered_recipient_indexes,
     normalize_recipient_group,
     preferred_group,
@@ -44,7 +45,7 @@ from core.groups import (
     set_selected,
     valid_group_or_default,
 )
-from core.importing import preview_import_file, rows_to_add
+from core.importing import preview_import_file, remove_imported_numbers, rows_to_add
 from core.phone import PHONE_FORMATS, format_phone_number, normalize_us_phone
 from core.recipients import build_clipboard_output
 
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self.resize(1180, 700)
         self.recipients, self.groups, self.settings, load_error = load_recipient_data()
         self.recent_group = DEFAULT_GROUP
+        self.last_imported_numbers: list[str] = []
         self._building_table = False
         self._building_groups = False
         self._build_ui()
@@ -148,17 +150,19 @@ class MainWindow(QMainWindow):
         deselect_all = QPushButton("Deselect All in This Group")
         edit_button = QPushButton("Edit Recipient")
         delete_button = QPushButton("Delete Recipient")
+        undo_import_button = QPushButton("Undo Last Import")
         export_button = QPushButton("Export Backup")
         clear_button = QPushButton("Clear All Data")
         select_all.clicked.connect(lambda: self.set_all_visible(True))
         deselect_all.clicked.connect(lambda: self.set_all_visible(False))
         edit_button.clicked.connect(self.edit_selected)
         delete_button.clicked.connect(self.delete_selected)
+        undo_import_button.clicked.connect(self.undo_last_import)
         export_button.clicked.connect(self.export_backup)
         clear_button.clicked.connect(self.clear_all)
 
         tools = QHBoxLayout()
-        for button in [select_all, deselect_all, edit_button, delete_button, export_button, clear_button]:
+        for button in [select_all, deselect_all, edit_button, delete_button, undo_import_button, export_button, clear_button]:
             tools.addWidget(button)
         tools.addStretch(1)
 
@@ -357,30 +361,20 @@ class MainWindow(QMainWindow):
         self.save_and_update(selected_group=group)
 
     def paste_list(self) -> None:
-        dialog = PasteListDialog(self, self.existing_normalized_numbers(), self.groups)
+        dialog = PasteListDialog(
+            self,
+            self.existing_normalized_numbers(),
+            self.groups,
+            self.select_recipient_by_normalized_phone,
+        )
         if dialog.exec() != PasteListDialog.Accepted:
             return
         group = self.valid_group(dialog.selected_group())
-        for recipient in rows_to_add(dialog.rows_to_add(), group):
-            self.recipients.append(recipient)
-        self.recent_group = group
-        self.save_and_update(selected_group=group)
+        added_numbers = self.add_import_rows(dialog.rows_to_add(), group)
         added, duplicates, existing, invalid = dialog.summary_counts()
-        extracted = added + duplicates + existing + invalid
-        invalid_examples = dialog.invalid_examples()
-        invalid_text = ""
-        if invalid_examples:
-            invalid_text = "\nInvalid examples:\n" + "\n".join(invalid_examples)
-        QMessageBox.information(
-            self,
-            "Paste list",
-            f"Extracted: {extracted}\n"
-            f"Added: {added}\n"
-            f"Duplicates skipped: {duplicates}\n"
-            f"Already existed: {existing}\n"
-            f"Invalid skipped: {invalid}"
-            f"{invalid_text}",
-        )
+        self.show_import_result("Paste list", added, duplicates, existing, invalid, dialog.invalid_examples())
+        if added_numbers:
+            self.last_imported_numbers = added_numbers
 
     def existing_normalized_numbers(self) -> set[str]:
         numbers: set[str] = set()
@@ -404,27 +398,79 @@ class MainWindow(QMainWindow):
         except (OSError, ValueError) as exc:
             QMessageBox.critical(self, "Import file", f"The file could not be imported: {exc}")
             return
-        group = self.preferred_group()
-        recipients = rows_to_add(preview_rows, group)
-        if not recipients:
-            QMessageBox.warning(self, "Import file", "No new valid phone numbers were found in the file.")
+        dialog = ImportPreviewDialog(
+            self,
+            preview_rows,
+            self.groups,
+            self.preferred_group(),
+            self.select_recipient_by_normalized_phone,
+        )
+        if dialog.exec() != ImportPreviewDialog.Accepted:
             return
-        for recipient in recipients:
+        group = self.valid_group(dialog.selected_group())
+        added_numbers = self.add_import_rows(dialog.rows_to_add(), group)
+        added, duplicates, existing, invalid = dialog.summary_counts()
+        if not added_numbers:
+            QMessageBox.warning(self, "Import file", "No new valid phone numbers were found in the file.")
+        self.show_import_result("Import file", added, duplicates, existing, invalid, dialog.invalid_examples())
+        if added_numbers:
+            self.last_imported_numbers = added_numbers
+
+    def add_import_rows(self, preview_rows, group: str) -> list[str]:
+        added_numbers: list[str] = []
+        for recipient in rows_to_add(preview_rows, group):
             self.recipients.append(recipient)
-        self.recent_group = group
-        self.save_and_update(selected_group=group)
-        added = len(recipients)
-        duplicates = sum(1 for row in preview_rows if row.status == "Duplicate in this batch")
-        existing = sum(1 for row in preview_rows if row.status == "Already exists")
-        invalid = sum(1 for row in preview_rows if row.status == "Invalid")
+            added_numbers.append(recipient["phone"])
+        if added_numbers:
+            self.recent_group = group
+            self.save_and_update(selected_group=group)
+        return added_numbers
+
+    def show_import_result(
+        self,
+        title: str,
+        added: int,
+        duplicates: int,
+        existing: int,
+        invalid: int,
+        invalid_examples: list[str],
+    ) -> None:
+        extracted = added + duplicates + existing + invalid
+        invalid_text = ""
+        if invalid_examples:
+            invalid_text = "\nInvalid examples:\n" + "\n".join(invalid_examples)
         QMessageBox.information(
             self,
-            "Import file",
+            title,
+            f"Extracted: {extracted}\n"
             f"Added: {added}\n"
-            f"Duplicates skipped: {duplicates}\n"
-            f"Already existed: {existing}\n"
-            f"Invalid skipped: {invalid}",
+            f"Already Exists: {existing}\n"
+            f"Duplicates: {duplicates}\n"
+            f"Invalid: {invalid}"
+            f"{invalid_text}",
         )
+
+    def undo_last_import(self) -> None:
+        if not self.last_imported_numbers:
+            QMessageBox.information(self, "Undo last import", "There is no import to undo.")
+            return
+        removed = remove_imported_numbers(self.recipients, self.last_imported_numbers)
+        self.last_imported_numbers = []
+        self.save_and_update()
+        QMessageBox.information(self, "Undo last import", f"Removed {removed} recipients from the last import.")
+
+    def select_recipient_by_normalized_phone(self, normalized: str) -> None:
+        index = find_recipient_index_by_phone(self.recipients, normalized)
+        if index is None:
+            return
+        self.refresh_group_list(ALL_RECIPIENTS)
+        self.search.clear()
+        self.refresh_table()
+        for row in range(self.table.rowCount()):
+            if self._recipient_index(row) == index:
+                self.table.selectRow(row)
+                self.table.scrollToItem(self.table.item(row, 1))
+                return
 
     def edit_selected(self) -> None:
         index = self.selected_visible_index()

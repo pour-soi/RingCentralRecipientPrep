@@ -42,6 +42,41 @@ class PastePreviewRow:
     source: str = ""
 
 
+@dataclass(frozen=True)
+class ImportPreviewSummary:
+    extracted: int
+    added: int
+    already_exists: int
+    duplicates: int
+    invalid: int
+
+
+def preview_summary(rows: list[PastePreviewRow]) -> ImportPreviewSummary:
+    added = sum(1 for row in rows if row.status == "Valid")
+    already_exists = sum(1 for row in rows if row.status == "Already exists")
+    duplicates = sum(1 for row in rows if row.status == "Duplicate in this batch")
+    invalid = sum(1 for row in rows if row.status == "Invalid")
+    return ImportPreviewSummary(
+        extracted=added + already_exists + duplicates + invalid,
+        added=added,
+        already_exists=already_exists,
+        duplicates=duplicates,
+        invalid=invalid,
+    )
+
+
+def invalid_examples(rows: list[PastePreviewRow], limit: int = 5) -> list[str]:
+    examples: list[str] = []
+    for row in rows:
+        if row.status != "Invalid":
+            continue
+        location = f"{row.source}: " if row.source else ""
+        examples.append(f"{location}{row.phone}")
+        if len(examples) >= limit:
+            break
+    return examples
+
+
 def parse_pasted_list(text: str) -> tuple[list[ParsedRecipient], list[RejectedRow]]:
     accepted: list[ParsedRecipient] = []
     rejected: list[RejectedRow] = []
@@ -106,6 +141,15 @@ def rows_to_add(rows: list[PastePreviewRow], group: str = DEFAULT_GROUP) -> list
         for row in rows
         if row.status == "Valid"
     ]
+
+
+def remove_imported_numbers(recipients: list[dict], normalized_numbers: list[str]) -> int:
+    numbers = set(normalized_numbers)
+    before = len(recipients)
+    recipients[:] = [
+        recipient for recipient in recipients if str(recipient.get("phone", "")) not in numbers
+    ]
+    return before - len(recipients)
 
 
 def normalized_numbers_from_text(text: str) -> list[str]:

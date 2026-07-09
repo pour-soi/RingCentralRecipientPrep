@@ -60,6 +60,13 @@ def recipient_phone_key(recipient: dict) -> str:
     return phone.strip()
 
 
+def find_recipient_index_by_phone(recipients: list[dict], normalized_phone: str) -> int | None:
+    for index, recipient in enumerate(recipients):
+        if recipient_phone_key(recipient) == normalized_phone:
+            return index
+    return None
+
+
 def valid_group_or_default(group: str, groups: Iterable[str]) -> str:
     clean_group = group.strip()
     return clean_group if clean_group in ensure_default_group(groups) else DEFAULT_GROUP

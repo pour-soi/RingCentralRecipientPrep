@@ -4,8 +4,16 @@ import zipfile
 from pathlib import Path
 
 from app.storage import make_export_data, make_saved_data, parse_saved_data, parse_saved_settings
-from core.groups import DEFAULT_GROUP
-from core.importing import normalized_numbers_from_text, preview_import_file, preview_pasted_recipients, rows_to_add
+from core.groups import DEFAULT_GROUP, find_recipient_index_by_phone
+from core.importing import (
+    invalid_examples,
+    normalized_numbers_from_text,
+    preview_import_file,
+    preview_pasted_recipients,
+    preview_summary,
+    remove_imported_numbers,
+    rows_to_add,
+)
 from core.phone import PHONE_FORMAT_DASHES
 
 
@@ -188,6 +196,46 @@ class BatchPasteTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].phone, "123")
         self.assertEqual(rows[0].status, "Invalid")
+
+    def test_preview_summary_counts_import_outcomes(self):
+        rows = preview_pasted_recipients(
+            f"{raw_phone()}\n{normalized()}\n{raw_phone('628')}\n123\n{raw_phone('707')}",
+            {normalized("707")},
+        )
+        summary = preview_summary(rows)
+
+        self.assertEqual(summary.extracted, 5)
+        self.assertEqual(summary.added, 2)
+        self.assertEqual(summary.already_exists, 1)
+        self.assertEqual(summary.duplicates, 1)
+        self.assertEqual(summary.invalid, 1)
+
+    def test_invalid_examples_include_source_and_phone_fragment(self):
+        rows = preview_pasted_recipients("123\n456")
+
+        self.assertEqual(invalid_examples(rows), ["Line 1: 123", "Line 2: 456"])
+
+    def test_undo_last_import_removes_only_imported_numbers(self):
+        recipients = [
+            {"phone": normalized(), "group": DEFAULT_GROUP},
+            {"phone": normalized("628"), "group": DEFAULT_GROUP},
+            {"phone": normalized("707"), "group": DEFAULT_GROUP},
+        ]
+
+        removed = remove_imported_numbers(recipients, [normalized("628"), normalized("707")])
+
+        self.assertEqual(removed, 2)
+        self.assertEqual([recipient["phone"] for recipient in recipients], [normalized()])
+
+    def test_existing_record_lookup_uses_normalized_phone(self):
+        recipients = [
+            {"phone": raw_phone(), "group": DEFAULT_GROUP},
+            {"phone": normalized("628"), "group": DEFAULT_GROUP},
+        ]
+
+        self.assertEqual(find_recipient_index_by_phone(recipients, normalized()), 0)
+        self.assertEqual(find_recipient_index_by_phone(recipients, normalized("628")), 1)
+        self.assertIsNone(find_recipient_index_by_phone(recipients, normalized("707")))
 
     def test_already_existing_normalized_number_is_skipped_from_messy_text(self):
         rows = preview_pasted_recipients(f"Existing contact: ({'415'}) {'123'}-{'4567'}", {normalized()})
