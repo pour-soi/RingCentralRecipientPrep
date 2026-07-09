@@ -36,4 +36,4 @@ PourSend can extract numbers from content such as:
 
 ## Testing
 
-The v2.0.0 release preparation was verified with 113 passing automated tests.
+The v2.0.0 release preparation was verified with 114 passing automated tests.

@@ -8,7 +8,7 @@ from core.groups import collect_groups, ensure_default_group, normalize_group_na
 from core.phone import PHONE_FORMAT_E164, format_phone_number, normalize_phone_format
 
 
-APP_FOLDER = "ringcentral_recipient_prep_data"
+APP_FOLDER = "poursend_data"
 DATA_FILE = "recipients.json"
 
 

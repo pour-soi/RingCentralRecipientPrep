@@ -170,14 +170,14 @@ Run the automated test suite:
 python -m unittest
 ```
 
-The current suite has 113 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, shortcut safety, and release versioning.
+The current suite has 114 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, shortcut safety, release versioning, and storage path branding.
 
 ## Data Location
 
 The app tries to save recipients in:
 
 ```text
-ringcentral_recipient_prep_data/recipients.json
+poursend_data/recipients.json
 ```
 
 next to the running app. If that location is not writable, it saves under the current Windows user profile.

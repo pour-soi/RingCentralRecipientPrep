@@ -5,7 +5,8 @@ __pycache__/
 .DS_Store
 
 # Local app data and recipient backups
-ringcentral_recipient_prep_data/
+poursend_data/
+*_recipient*_data/
 *backup*.json
 recipients*.json
 
