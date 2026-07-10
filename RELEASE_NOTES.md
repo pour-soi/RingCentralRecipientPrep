@@ -29,7 +29,7 @@ PourSend can extract numbers from content such as:
 
 ## Data and Compatibility
 
-- Existing supported legacy data is migrated automatically.
+- Supported older data schemas are migrated automatically.
 - Phone number is the recipient identity.
 - New recipients do not require names.
 - Backup files use PourSend's JSON backup workflow.

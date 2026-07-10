@@ -9,7 +9,7 @@
 - Detects duplicate normalized phone identities.
 - Supports optional notes.
 - Uses a single-group recipient model.
-- Migrates supported older recipient data without requiring names or groups.
+- Migrates supported older data schemas without requiring names or groups.
 
 ### Groups
 

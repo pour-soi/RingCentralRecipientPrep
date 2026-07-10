@@ -1,83 +1,96 @@
 # PourSend
 
-PourSend is a local Windows desktop utility for organizing recipients, batch-importing phone numbers, and copying checked recipient numbers for use with RingCentral.
+A local Windows desktop utility for organizing recipients, batch-importing phone numbers, and copying checked recipient numbers for manual use with RingCentral.
 
-Current release: `v2.0.0`
+[![Latest Release](https://img.shields.io/github/v/release/pour-soi/PourSend?label=latest%20release)](https://github.com/pour-soi/PourSend/releases/tag/v2.0.0)
+![Windows](https://img.shields.io/badge/platform-Windows-0078D4)
+![Tests](https://img.shields.io/badge/tests-114%20passing-brightgreen)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-The application does not send messages itself. You copy prepared recipient numbers from the app, paste them into RingCentral, and send manually.
+Portable Windows app · Local data · No telemetry
+
+PourSend does not send messages itself. You copy prepared recipient numbers from the app, paste them into RingCentral, and send manually.
 
 This is an independent, unofficial utility and is not affiliated with or endorsed by RingCentral.
 
-## Core Workflow
+## Download
+
+**Current release: v2.0.0**
+
+1. Download `PourSend-v2.0.0-Windows.zip` from the [official v2.0.0 GitHub Release](https://github.com/pour-soi/PourSend/releases/tag/v2.0.0).
+2. Extract the zip.
+3. Run `PourSend.exe`.
+
+No installation is required.
+
+## Highlights
+
+### Smart Import
+
+- Paste copied phone lists with **Paste List**.
+- Import TXT, CSV, and XLSX files.
+- Drag and drop TXT, CSV, or XLSX files into the app.
+- Extract multiple numbers from one line.
+- Extract numbers from mixed text, labels, and copied CRM-style content.
+- Review an import preview before adding recipients.
+- See duplicate, already-existing, and invalid counts.
+- Undo the most recent successful import.
+
+### Search & Organization
+
+- Organize recipients into groups.
+- Search instantly while typing.
+- Search phone numbers regardless of punctuation.
+- Sort by recently added order, phone number, or group.
+- Choose ascending or descending sort direction.
+- Display phone numbers in selectable formats.
+- Use checked-recipient workflows for copy, export, move, and batch edit actions.
+
+### Copy & Export
+
+- Copy displayed numbers, digits only, or E.164 numbers.
+- Copy checked recipients or the current search results.
+- Export TXT, CSV, or XLSX files.
+- Export all recipients, the current group, the current search, or checked recipients.
+
+### Backup & Recovery
+
+- Export JSON backups.
+- Restore from JSON backups.
+- Preserve recipients, groups, settings, and notes through the backup workflow.
+
+### Productivity
+
+- Batch edit checked recipients.
+- View total recipients, current group count, current search count, stored duplicate count, and checked counts.
+- Use keyboard shortcuts without overriding normal text-field editing.
+- Save changes automatically after data-changing workflows.
+- Work with large recipient lists more comfortably.
+
+### Privacy
+
+- Recipient data is stored locally.
+- The app does not require a cloud account.
+- No telemetry is collected.
+- There is no RingCentral API integration.
+- There is no automatic message sending.
+
+## How To Use
+
+### Basic Workflow
 
 ```text
 Open app -> Choose a group or recipients -> Check recipients -> Copy numbers -> Paste into RingCentral -> Send manually
 ```
 
-Batch import workflow:
+### Add Recipients
 
-```text
-Copy many phone numbers -> Paste List -> Review preview -> Add All Recipients -> Select group -> Copy
-```
+- Use **Add Recipient** to add one phone number manually.
+- Use **Paste List** to paste copied text.
+- Use **Import File** for TXT, CSV, or XLSX files.
+- Drag and drop a supported file into the app.
 
-Common workflows:
-
-1. Add a phone number manually with **Add Recipient**.
-2. Paste copied text with **Paste List**.
-3. Import a TXT, CSV, or XLSX file with **Import File**.
-4. Drag and drop a TXT, CSV, or XLSX file into the app.
-5. Review the import preview before adding recipients.
-6. Organize recipients by group.
-7. Search and sort the current recipient list.
-8. Check recipients to include them in checked-recipient actions.
-9. Copy numbers for manual use in RingCentral.
-10. Export recipient data to TXT, CSV, or XLSX.
-11. Create and restore JSON backups.
-12. Undo the most recent successful import when needed.
-
-## Features
-
-- Add, edit, and delete recipients.
-- Search by phone number or notes.
-- Search instantly while typing.
-- Search phone numbers regardless of punctuation.
-- Organize recipients into groups.
-- Move recipients between groups.
-- Sort recipients by phone number, group, or recently added order.
-- Display, copy, and export phone numbers in selectable formats.
-- View `All Recipients`.
-- Search within the currently selected group.
-- Select all visible recipients with `Select All in This Group`.
-- Deselect all visible recipients with `Deselect All in This Group`.
-- Batch edit checked recipients to change their group or replace notes.
-- Import through `Paste List`.
-- Paste phone-only batches.
-- Paste phone numbers from name + phone rows while ignoring names for saved recipients.
-- Import TXT, CSV, and XLSX files with supported phone-number formats.
-- Drag and drop TXT, CSV, or XLSX files into the app to import them.
-- Preview imports before adding recipients.
-- Undo the most recent successful import.
-- Assign a pasted batch to one existing group.
-- Detect duplicates inside a pasted batch.
-- Detect phone numbers that already exist.
-- Detect invalid phone numbers before import.
-- Store optional notes for recipients.
-- Save recipients and groups locally between launches.
-- Copy checked recipients or the current search results as displayed numbers, digits only, or E.164.
-- Export recipients to TXT, CSV, or Excel.
-- Export all recipients, the current group, the current search, or checked recipients.
-- Export and import JSON backups.
-- Clear all data with confirmation.
-- View total recipients, current group count, current search count, stored duplicate count, and checked counts.
-- Use keyboard shortcuts for paste list, search, select visible recipients, undo last import, and delete.
-- Normalize valid US phone numbers to `+1XXXXXXXXXX`.
-- Remove duplicate numbers during copy.
-- Skip invalid numbers during copy.
-- Copy as one number per line.
-
-## Batch Import Behavior
-
-Each valid phone number in a pasted batch becomes a separate recipient unless that normalized phone number already exists.
+Each valid phone number becomes a separate recipient unless that normalized phone number already exists.
 
 Names and surrounding labels in pasted or imported text are used only to help detect phone numbers. They are not saved as recipient identity.
 
@@ -87,16 +100,50 @@ During preview and import:
 - Phone numbers that already exist in the recipient list are skipped.
 - Invalid phone numbers are skipped.
 - Existing recipients are never overwritten.
-- Existing legacy names are preserved for compatibility, but new recipient workflows do not require names.
-- Only newly added recipients receive the selected batch group.
+- Supported older data schemas are migrated automatically.
+- New recipient workflows do not require names.
+- Only newly added recipients receive the chosen batch group.
 
-## Groups
+### Groups
 
 A recipient belongs to one group. Records without a valid group fall back to `Default`.
 
 Deleting a group does not delete the recipients inside it. It moves those recipients to `Default`.
 
 You can open a group, search within that group, then select or deselect only the visible recipients in that group.
+
+### Copy Numbers
+
+Copy options include:
+
+- **Displayed Number**
+- **Digits Only**
+- **E.164**
+- **Checked Numbers**
+- **Current Search**
+
+Copied output is one number per line. Duplicate numbers are removed during copy, and invalid numbers are skipped.
+
+### Export Data
+
+Export formats:
+
+- TXT
+- CSV
+- XLSX
+
+Export scopes:
+
+- All recipients
+- Current group
+- Current search
+- Checked recipients
+
+### Back Up And Restore
+
+Use **Export Backup** to save a JSON backup.
+
+Use **Import Backup** to restore recipients, groups, settings, and notes from a PourSend backup file.
 
 ## Keyboard Shortcuts
 
@@ -106,20 +153,17 @@ You can open a group, search within that group, then select or deselect only the
 - `Ctrl+Z`: undo the most recent successful import when focus is not in a text field.
 - `Delete`: delete the selected recipient rows when focus is not in a text field.
 
-## Privacy
+## Data Location
 
-PourSend is local-only.
+The app tries to save recipients in:
 
-- All recipient data is stored locally.
-- The application makes no network requests.
-- No analytics are collected.
-- No telemetry is collected.
-- No cloud syncing is used.
-- No contact syncing is used.
-- There is no RingCentral API integration.
-- There is no automatic message sending.
+```text
+poursend_data/recipients.json
+```
 
-## Installation / Running From Source
+next to the running app. If that location is not writable, it saves under the current Windows user profile.
+
+## Running From Source
 
 On Windows:
 
@@ -139,29 +183,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Portable Windows Build
-
-This repository includes a manual GitHub Actions workflow that builds:
-
-```text
-PourSend-v2.0.0-Windows.zip
-```
-
-The zip contains `PourSend.exe`, `README.md`, and `LICENSE`.
-
-To build it:
-
-1. Open the repository on GitHub.
-2. Go to **Actions**.
-3. Select **Build PourSend Windows executable**.
-4. Click **Run workflow**.
-5. Run the workflow on `main`.
-6. When it finishes, download the `PourSend-v2.0.0-Windows` artifact.
-7. Extract `PourSend-v2.0.0-Windows.zip`.
-8. Run `PourSend.exe`.
-
-This is a portable executable, not an official signed installer.
-
 ## Testing
 
 Run the automated test suite:
@@ -171,13 +192,3 @@ python -m unittest
 ```
 
 The current suite has 114 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, shortcut safety, release versioning, and storage path branding.
-
-## Data Location
-
-The app tries to save recipients in:
-
-```text
-poursend_data/recipients.json
-```
-
-next to the running app. If that location is not writable, it saves under the current Windows user profile.
