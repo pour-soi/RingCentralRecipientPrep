@@ -2,6 +2,9 @@ name: Build PourSend Windows executable
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 jobs:
   build-windows:
@@ -10,10 +13,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -39,6 +44,20 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "package=PourSend-v$version-Windows" >> $env:GITHUB_OUTPUT
 
+      - name: Validate branding assets
+        shell: pwsh
+        run: |
+          $required = @(
+            "assets/poursend-logo.png",
+            "assets/poursend-icon-256.png",
+            "assets/poursend.ico"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Required branding asset is missing: $path"
+            }
+          }
+
       - name: Build executable
         run: pyinstaller --noconfirm --onefile --windowed --name PourSend --icon assets/poursend.ico --add-data "assets;assets" main.py
 
@@ -52,9 +71,46 @@ jobs:
           Copy-Item LICENSE $package/
           Compress-Archive -Path $package -DestinationPath "$package.zip" -Force
 
+      - name: Validate portable package
+        shell: pwsh
+        run: |
+          $package = "${{ steps.version.outputs.package }}"
+          $zip = "$package.zip"
+          if (-not (Test-Path $zip)) {
+            throw "Expected package was not created: $zip"
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try {
+            $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+            $required = @(
+              "$package/PourSend.exe",
+              "$package/README.md",
+              "$package/LICENSE"
+            )
+            foreach ($entry in $required) {
+              if ($entries -notcontains $entry) {
+                throw "Package validation failed. Missing required file in ZIP: $entry"
+              }
+            }
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+      - name: Generate checksum
+        shell: pwsh
+        run: |
+          $package = "${{ steps.version.outputs.package }}"
+          $zip = "$package.zip"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Set-Content "$zip.sha256" -Encoding ascii
+
       - name: Upload portable package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.version.outputs.package }}
-          path: ${{ steps.version.outputs.package }}.zip
+          path: |
+            ${{ steps.version.outputs.package }}.zip
+            ${{ steps.version.outputs.package }}.zip.sha256
           if-no-files-found: error

@@ -24,10 +24,10 @@ This is an independent, unofficial utility and is not affiliated with or endorse
 **Current release: v2.1.1**
 
 1. Download `PourSend-v2.1.1-Windows.zip` from the [official v2.1.1 GitHub Release](https://github.com/pour-soi/PourSend/releases/tag/v2.1.1).
-2. Extract the zip.
-3. Run `PourSend.exe`.
+2. Extract the complete zip file to a normal folder, such as Desktop or Documents.
+3. Run `PourSend.exe` from the extracted folder.
 
-No installation is required.
+No installation is required. Do not run `PourSend.exe` directly from inside the zip file. Windows may block files or prevent PourSend from saving data where you expect until the package is fully extracted.
 
 ## Highlights
 
@@ -167,13 +167,54 @@ Use **Import Backup** to restore recipients, groups, settings, and notes from a 
 
 ## Data Location
 
-The app tries to save recipients in:
+PourSend is portable and stores data locally.
+
+When running the packaged Windows app, the primary data file is:
 
 ```text
-poursend_data/recipients.json
+<folder containing PourSend.exe>\poursend_data\recipients.json
 ```
 
-next to the running app. If that location is not writable, it saves under the current Windows user profile.
+When running from source, the primary data file is:
+
+```text
+<repository root>\poursend_data\recipients.json
+```
+
+If the primary folder is not writable, PourSend falls back to:
+
+```text
+%USERPROFILE%\.poursend_data\recipients.json
+```
+
+Use **Export Backup** before moving PourSend to a different folder or computer. Backup files are user-chosen JSON files and are separate from the automatic local data file.
+
+## Troubleshooting
+
+### Windows SmartScreen
+
+PourSend is distributed as an unsigned portable Windows executable. Windows may show a SmartScreen warning the first time you run it. Only continue if you downloaded the zip from the official GitHub Release page.
+
+### Missing Or Blocked Executable
+
+If `PourSend.exe` is missing, blocked, or fails to open:
+
+- Extract the entire zip before running the app.
+- Keep `PourSend.exe`, `README.md`, and `LICENSE` together in the extracted folder.
+- Check whether Windows Security or another antivirus tool quarantined the executable.
+- If Windows marks the file as downloaded from the internet, open file properties and unblock it.
+
+### Data Not Found
+
+Check the data locations above. If you moved the app folder, the original `poursend_data` folder may still be next to the previous copy of `PourSend.exe`.
+
+### Display Scaling
+
+PourSend is tested at common Windows scaling levels, including 100%, 125%, and 150%. If the interface looks clipped after changing display scaling, close and reopen the app.
+
+### Report An Issue
+
+Use [GitHub Issues](https://github.com/pour-soi/PourSend/issues) for bug reports and feature requests. Include your PourSend version, Windows version, display scaling, what you expected, what happened, and a screenshot when useful.
 
 ## Running From Source
 
@@ -203,4 +244,4 @@ Run the automated test suite:
 python -m unittest
 ```
 
-The current suite has 134 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, shortcut safety, release versioning, and storage path branding.
+The current suite has 140 tests covering phone normalization, copy behavior, paste parsing, CSV detection, grouping, storage migration, batch phone-number import, search, sorting, phone display formatting, export formats, export scopes, backup import/export, shortcut safety, release versioning, and storage path branding.
