@@ -40,7 +40,7 @@ jobs:
           "package=PourSend-v$version-Windows" >> $env:GITHUB_OUTPUT
 
       - name: Build executable
-        run: pyinstaller --noconfirm --onefile --windowed --name PourSend main.py
+        run: pyinstaller --noconfirm --onefile --windowed --name PourSend --icon assets/poursend.ico --add-data "assets;assets" main.py
 
       - name: Create portable package
         shell: pwsh

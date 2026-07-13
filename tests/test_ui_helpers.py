@@ -25,10 +25,17 @@ class UiHelperTests(unittest.TestCase):
     def test_workspace_title_and_empty_state_copy(self):
         self.assertEqual(workspace_title(ALL_RECIPIENTS), "All Recipients")
         self.assertEqual(workspace_title("Follow Up"), "Follow Up")
-        self.assertEqual(empty_state_message("amy"), ("No recipients found", "Try changing your search."))
+        self.assertEqual(
+            empty_state_message("amy"),
+            ("No recipients found", "No recipients match the current search. Try different search terms or filters."),
+        )
         self.assertEqual(
             empty_state_message(""),
-            ("No recipients found", "Try changing your search or add a new recipient."),
+            ("No recipients found", "No recipients match the current view."),
+        )
+        self.assertEqual(
+            empty_state_message("", has_recipients=False),
+            ("No recipients found", "Add recipients manually, paste a list, or import a file to get started."),
         )
 
 

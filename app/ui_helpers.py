@@ -25,10 +25,12 @@ def workspace_title(group_filter: str) -> str:
     return group_filter or DEFAULT_GROUP
 
 
-def empty_state_message(query: str) -> tuple[str, str]:
+def empty_state_message(query: str, has_recipients: bool = True) -> tuple[str, str]:
+    if not has_recipients:
+        return "No recipients found", "Add recipients manually, paste a list, or import a file to get started."
     if query.strip():
-        return "No recipients found", "Try changing your search."
-    return "No recipients found", "Try changing your search or add a new recipient."
+        return "No recipients found", "No recipients match the current search. Try different search terms or filters."
+    return "No recipients found", "No recipients match the current view."
 
 
 def _deduped_recipients(recipients: list[dict]) -> list[dict]:

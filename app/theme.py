@@ -40,11 +40,16 @@ QWidget#AppRoot {
 QFrame#Header,
 QFrame#Sidebar,
 QFrame#Workspace,
-QFrame#BulkBar,
 QFrame#DialogSurface {
     background: #ffffff;
     border: 1px solid #dce6f2;
     border-radius: 16px;
+}
+
+QFrame#ActionBar {
+    background: #f8fbff;
+    border: 1px solid #dce6f2;
+    border-radius: 8px;
 }
 
 QFrame#Header {
@@ -56,17 +61,14 @@ QFrame#Header {
 }
 
 QLabel#AppTitle {
-    font-size: 20pt;
-    font-weight: 700;
-    color: #17233b;
+    font-size: 17pt;
+    font-weight: 600;
+    color: #243653;
 }
 
 QLabel#AppIcon {
-    background: #3b7cf4;
-    color: #ffffff;
-    font-size: 27pt;
-    font-weight: 750;
-    border-radius: 13px;
+    background: transparent;
+    border: 0;
 }
 
 QLabel#MutedText,
@@ -75,9 +77,10 @@ QLabel#EmptySubtitle {
     font-size: 10pt;
 }
 
-QLabel#AppSubtitle {
+QLabel#FilterLabel {
     color: #74819a;
-    font-size: 9pt;
+    font-size: 8.5pt;
+    font-weight: 600;
 }
 
 QLabel#SectionTitle,
@@ -91,6 +94,10 @@ QLabel#EmptyTitle {
     font-size: 15pt;
     font-weight: 650;
     color: #1f2937;
+}
+
+QWidget#EmptyStateContent {
+    background: transparent;
 }
 
 QLabel#BulkCount {
@@ -132,8 +139,8 @@ QLabel#GroupTag[groupName="Female Mandarin"] {
 }
 
 QLabel#GroupTag[groupName="Male Cantonese"] {
-    background: #eaf3ff;
-    color: #2f6fe3;
+    background: #edf4ff;
+    color: #4779df;
 }
 
 QLabel#GroupTag[groupName="Follow Up"] {
@@ -155,7 +162,7 @@ QLineEdit, QTextEdit, QComboBox, QListWidget, QTableWidget {
     background: #ffffff;
     border: 1px solid #e7ecf4;
     border-radius: 9px;
-    selection-background-color: #eaf3ff;
+    selection-background-color: #edf4ff;
     selection-color: #1f2937;
 }
 
@@ -187,7 +194,7 @@ QComboBox::down-arrow {
 }
 
 QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QListWidget:focus, QTableWidget:focus {
-    border: 1px solid #4f8ef7;
+    border: 1px solid #5d8ff3;
 }
 
 QPushButton {
@@ -200,12 +207,12 @@ QPushButton {
 }
 
 QPushButton:hover {
-    background: #edf5ff;
+    background: #f1f6ff;
     border-color: #c9d8f0;
 }
 
 QPushButton:pressed {
-    background: #eaf3ff;
+    background: #edf4ff;
 }
 
 QPushButton:disabled {
@@ -215,8 +222,8 @@ QPushButton:disabled {
 }
 
 QPushButton[buttonRole="primary"] {
-    background: #3b7cf4;
-    border-color: #3b7cf4;
+    background: #5d8ff3;
+    border-color: #5d8ff3;
     color: #ffffff;
     font-weight: 600;
     min-height: 48px;
@@ -225,8 +232,8 @@ QPushButton[buttonRole="primary"] {
 }
 
 QPushButton[buttonRole="primary"]:hover {
-    background: #2f6fe3;
-    border-color: #2f6fe3;
+    background: #4779df;
+    border-color: #4779df;
 }
 
 QPushButton[buttonRole="danger"] {
@@ -247,7 +254,7 @@ QPushButton[buttonRole="subtle"] {
 }
 
 QPushButton[buttonRole="subtle"]:hover {
-    background: #edf5ff;
+    background: #f1f6ff;
     border-color: #e7ecf4;
 }
 
@@ -274,11 +281,11 @@ QListWidget::item {
 }
 
 QListWidget::item:hover {
-    background: #edf5ff;
+    background: #f1f6ff;
 }
 
 QListWidget::item:selected {
-    background: #eaf3ff;
+    background: #edf4ff;
     color: #1f2937;
 }
 
@@ -296,7 +303,7 @@ QTableWidget::item {
 }
 
 QTableWidget::item:selected {
-    background: #eaf3ff;
+    background: #edf4ff;
     color: #1f2937;
 }
 
@@ -322,7 +329,7 @@ QMenu::item {
 }
 
 QMenu::item:selected {
-    background: #eaf3ff;
+    background: #edf4ff;
 }
 
 QDialogButtonBox QPushButton {

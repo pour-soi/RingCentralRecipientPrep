@@ -1,10 +1,14 @@
 # PourSend
 
+<p align="center">
+  <img src="assets/poursend-logo.png" alt="PourSend official logo" width="260">
+</p>
+
 A local Windows desktop utility for organizing recipients, batch-importing phone numbers, and copying checked recipient numbers for manual use with RingCentral.
 
 [![Latest Release](https://img.shields.io/github/v/release/pour-soi/PourSend?label=latest%20release)](https://github.com/pour-soi/PourSend/releases/tag/v2.0.0)
 ![Windows](https://img.shields.io/badge/platform-Windows-0078D4)
-![Tests](https://img.shields.io/badge/tests-134%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-140%20passing-brightgreen)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Portable Windows app · Local data · No telemetry
@@ -76,6 +80,10 @@ No installation is required.
 - No telemetry is collected.
 - There is no RingCentral API integration.
 - There is no automatic message sending.
+
+## Brand Assets
+
+`assets/poursend-logo.png` is the official PourSend logo and the source artwork for application icons. Do not redraw, recolor, crop, stretch, or reinterpret it. Scale it proportionally on clean backgrounds with comfortable whitespace.
 
 ## How To Use
 
