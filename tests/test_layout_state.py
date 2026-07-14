@@ -6,7 +6,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QRect
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QLabel, QSizePolicy, QWidget
 
 from app.main import LayoutMetrics, MainWindow
 from core.groups import DEFAULT_GROUP
@@ -18,6 +18,16 @@ def app() -> QApplication:
 
 def recipient(phone: str, selected: bool = False) -> dict:
     return {"phone": phone, "groups": [DEFAULT_GROUP], "notes": "", "selected": selected}
+
+
+def settle_layout(window: MainWindow, app: QApplication) -> None:
+    for _ in range(8):
+        app.processEvents()
+    window.arrange_responsive_layout()
+    window.arrange_filter_toolbar()
+    window.resize_table_columns()
+    for _ in range(4):
+        app.processEvents()
 
 
 class LayoutStateTests(unittest.TestCase):
@@ -54,6 +64,45 @@ class LayoutStateTests(unittest.TestCase):
         self.assertIsNotNone(app_icon.pixmap())
         self.assertFalse(app_icon.pixmap().isNull())
 
+    def test_brand_logo_uses_bounded_proportional_display_size_without_scaled_contents(self):
+        window = self.make_window([])
+        self.addCleanup(window.close)
+
+        app_icon = window.findChild(QLabel, "AppIcon")
+        brand = window.findChild(QWidget, "BrandLockup")
+
+        self.assertIsNotNone(app_icon)
+        self.assertIsNotNone(brand)
+        self.assertGreaterEqual(app_icon.size().width(), LayoutMetrics.LOGO_MIN_SIZE)
+        self.assertLessEqual(app_icon.size().width(), LayoutMetrics.LOGO_SIZE)
+        self.assertEqual(app_icon.size().width(), app_icon.size().height())
+        self.assertEqual(app_icon.pixmap().width(), app_icon.pixmap().height())
+        self.assertFalse(app_icon.hasScaledContents())
+        self.assertEqual(app_icon.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
+        self.assertEqual(app_icon.sizePolicy().verticalPolicy(), QSizePolicy.Fixed)
+        self.assertEqual(brand.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
+        self.assertEqual(brand.sizePolicy().verticalPolicy(), QSizePolicy.Fixed)
+
+    def test_brand_logo_resizes_proportionally_with_window_width(self):
+        window = self.make_window([])
+        self.addCleanup(window.close)
+        app_icon = window.findChild(QLabel, "AppIcon")
+        sizes = []
+
+        for width, height in ((1400, 900), (1200, 800), (1000, 650), (900, 600), (720, 480)):
+            window.resize(width, height)
+            window.show()
+            settle_layout(window, self.app)
+            sizes.append(app_icon.size().width())
+
+            self.assertEqual(app_icon.size().width(), app_icon.size().height())
+            self.assertEqual(app_icon.pixmap().width(), app_icon.pixmap().height())
+
+        self.assertEqual(sizes, sorted(sizes, reverse=True))
+        self.assertEqual(sizes[0], LayoutMetrics.LOGO_SIZE)
+        self.assertEqual(sizes[-1], LayoutMetrics.LOGO_MIN_SIZE)
+        self.assertGreater(len(set(sizes)), 3)
+
     def test_populated_table_shows_action_bar_without_bulk_actions_until_checked(self):
         window = self.make_window([recipient("+14151111111"), recipient("+16282222222")])
         self.addCleanup(window.close)
@@ -87,11 +136,11 @@ class LayoutStateTests(unittest.TestCase):
 
         window.resize(1600, 900)
         window.arrange_filter_toolbar()
-        self.assertEqual(window.filter_bar_columns, LayoutMetrics.FILTER_COLUMNS_WIDE)
+        self.assertEqual(window.filter_bar_columns, LayoutMetrics.FILTER_COLUMNS)
 
         window.resize(1280, 720)
         window.arrange_filter_toolbar()
-        self.assertEqual(window.filter_bar_columns, LayoutMetrics.FILTER_COLUMNS_MEDIUM)
+        self.assertEqual(window.filter_bar_columns, LayoutMetrics.FILTER_COLUMNS)
 
     def test_main_window_has_small_safety_minimum_size(self):
         window = self.make_window([recipient("+14151111111")])
@@ -121,6 +170,37 @@ class LayoutStateTests(unittest.TestCase):
         self.assertIs(window.centralWidget(), window.main_scroll_area)
         self.assertGreater(window.main_scroll_area.horizontalScrollBar().maximum(), 0)
         self.assertGreater(window.main_scroll_area.verticalScrollBar().maximum(), 0)
+
+    def test_practical_compact_widths_avoid_horizontal_scrolling(self):
+        window = self.make_window([recipient("+14151111111"), recipient("+16282222222", selected=True)])
+        self.addCleanup(window.close)
+
+        for width, height in ((1100, 700), (1000, 650), (900, 600), (800, 540), (720, 480)):
+            window.resize(width, height)
+            window.show()
+            settle_layout(window, self.app)
+
+            self.assertEqual(window.main_scroll_area.horizontalScrollBar().maximum(), 0)
+            self.assertGreater(window.main_scroll_area.verticalScrollBar().maximum(), 0)
+
+    def test_sidebar_and_table_columns_resize_fluidly(self):
+        window = self.make_window([recipient("+14151111111"), recipient("+16282222222", selected=True)])
+        self.addCleanup(window.close)
+
+        measurements = []
+        for width, height in ((1100, 700), (1000, 650), (900, 600), (800, 540), (720, 480)):
+            window.resize(width, height)
+            window.show()
+            settle_layout(window, self.app)
+            sidebar = window.findChild(QWidget, "Sidebar")
+            measurements.append((sidebar.width(), window.table_stack.width(), window.table.columnWidth(1)))
+
+        sidebars = [measurement[0] for measurement in measurements]
+        table_viewports = [measurement[1] for measurement in measurements]
+        phone_columns = [measurement[2] for measurement in measurements]
+        self.assertEqual(sidebars, sorted(sidebars, reverse=True))
+        self.assertEqual(table_viewports, sorted(table_viewports, reverse=True))
+        self.assertEqual(phone_columns, sorted(phone_columns, reverse=True))
 
     def test_large_fixed_child_constraints_do_not_reset_window_minimum(self):
         window = self.make_window([recipient("+14151111111")])

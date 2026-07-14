@@ -185,13 +185,13 @@ QTextEdit {
 
 QComboBox {
     min-height: 46px;
-    padding: 4px 34px 4px 14px;
+    padding: 4px 14px 4px 8px;
     border-radius: 9px;
 }
 
 QComboBox::drop-down {
     border: 0;
-    width: 30px;
+    width: 14px;
 }
 
 QComboBox::down-arrow {
@@ -263,6 +263,11 @@ QPushButton[buttonRole="subtle"] {
 QPushButton[buttonRole="subtle"]:hover {
     background: #f1f6ff;
     border-color: #e7ecf4;
+}
+
+QPushButton[responsiveCommand="true"] {
+    padding-left: 8px;
+    padding-right: 8px;
 }
 
 QPushButton#IconButton {

@@ -105,6 +105,7 @@ class LayoutMetrics:
     CONTROL_HEIGHT = 46
     PRIMARY_CONTROL_HEIGHT = 48
     LOGO_SIZE = 92
+    LOGO_MIN_SIZE = 64
     ICON_BUTTON_SIZE = 34
     ICON_SIZE = 18
     SIDEBAR_MIN_WIDTH = 168
@@ -113,15 +114,13 @@ class LayoutMetrics:
     SIDEBAR_PADDING = 18
     GROUP_ROW_MARGIN_X = 10
     LIST_ITEM_SPACING = 2
-    SEARCH_MIN_WIDTH = 120
+    SEARCH_MIN_WIDTH = 96
     SEARCH_MAX_WIDTH = 460
-    SORT_FIELD_MIN_WIDTH = 190
-    SORT_DIRECTION_MIN_WIDTH = 170
-    PHONE_FORMAT_MIN_WIDTH = 180
-    COPY_SCOPE_MIN_WIDTH = 220
-    COPY_FORMAT_MIN_WIDTH = 210
-    FILTER_WIDE_WIDTH = 980
-    FILTER_MEDIUM_WIDTH = 700
+    SORT_FIELD_MIN_WIDTH = 120
+    SORT_DIRECTION_MIN_WIDTH = 120
+    PHONE_FORMAT_MIN_WIDTH = 120
+    COPY_SCOPE_MIN_WIDTH = 120
+    COPY_FORMAT_MIN_WIDTH = 120
     PAGE_TITLE_MAX_WIDTH = 460
     BUTTON_MIN_WIDTHS = {
         "add": 150,
@@ -131,6 +130,14 @@ class LayoutMetrics:
         "export": 96,
         "more": 96,
     }
+    BUTTON_MINIMUM_WIDTHS = {
+        "add": 52,
+        "paste": 46,
+        "import": 48,
+        "copy": 46,
+        "export": 46,
+        "more": 54,
+    }
     TABLE_SELECT_WIDTH = 76
     TABLE_STATUS_WIDTH = 124
     TABLE_PHONE_MIN_WIDTH = 150
@@ -138,9 +145,7 @@ class LayoutMetrics:
     TABLE_GROUP_MIN_WIDTH = 180
     TABLE_GROUP_MAX_WIDTH = 520
     TABLE_NOTES_MIN_WIDTH = 120
-    FILTER_COLUMNS_WIDE = 5
-    FILTER_COLUMNS_MEDIUM = 3
-    FILTER_COLUMNS_NARROW = 2
+    FILTER_COLUMNS = 3
     TABLE_HEADER_HEIGHT = 48
     TABLE_ROW_HEIGHT = 68
     SIDEBAR_ROW_HEIGHT = 50
@@ -158,6 +163,16 @@ class LayoutMetrics:
     SPACING_LG = 16
     SPACING_XL = 24
     BRAND_GAP = 8
+
+
+COMMAND_LABELS = {
+    "add": ("Add Recipient", "Add"),
+    "paste": ("Paste List", "Paste"),
+    "import": ("Import File", "Import"),
+    "copy": ("Copy", "Copy"),
+    "export": ("Export", "Export"),
+    "more": ("More", "More"),
+}
 
 
 SVG_ICONS = {
@@ -250,7 +265,8 @@ def control_group(label_text: str, control: QWidget) -> QWidget:
     label = QLabel(label_text)
     label.setObjectName("FilterLabel")
     group = QWidget()
-    group.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
+    group.setMinimumWidth(0)
+    group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
     layout = QVBoxLayout(group)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(LayoutMetrics.SPACING_XS)
@@ -260,9 +276,11 @@ def control_group(label_text: str, control: QWidget) -> QWidget:
 
 
 def configure_combo(combo: QComboBox, minimum_width: int) -> QComboBox:
-    combo.setMinimumWidth(minimum_width)
+    combo.setMinimumWidth(min(96, minimum_width))
+    combo.setMinimumContentsLength(8)
+    combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
     combo.setMinimumHeight(LayoutMetrics.CONTROL_HEIGHT)
-    combo.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
+    combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
     return combo
 
 
@@ -277,6 +295,32 @@ def icon_button(text: str, icon: str, role: str = SECONDARY_BUTTON, color: str =
     button.setMinimumHeight(LayoutMetrics.PRIMARY_CONTROL_HEIGHT if role == PRIMARY_BUTTON else LayoutMetrics.CONTROL_HEIGHT)
     button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
     return button
+
+
+def clear_layout(layout) -> None:
+    while layout.count():
+        item = layout.takeAt(0)
+        if item.widget():
+            item.widget().setParent(None)
+        elif item.layout():
+            clear_layout(item.layout())
+
+
+def fluid_ratio(width: int, narrow: int = 720, wide: int = 1400) -> float:
+    if width <= narrow:
+        return 0.0
+    if width >= wide:
+        return 1.0
+    return (width - narrow) / (wide - narrow)
+
+
+def fluid_value(width: int, narrow_value: int, wide_value: int, narrow: int = 720, wide: int = 1400) -> int:
+    ratio = fluid_ratio(width, narrow, wide)
+    return round(narrow_value + (wide_value - narrow_value) * ratio)
+
+
+def clamp(value: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(maximum, value))
 
 
 class RecipientTableDelegate(QStyledItemDelegate):
@@ -356,11 +400,15 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         app_icon = QLabel()
+        self.app_icon = app_icon
         app_icon.setObjectName("AppIcon")
         app_icon.setAlignment(Qt.AlignCenter)
         app_icon.setFixedSize(LayoutMetrics.LOGO_SIZE, LayoutMetrics.LOGO_SIZE)
+        app_icon.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        app_icon.setScaledContents(False)
         app_icon.setPixmap(logo_pixmap(LayoutMetrics.LOGO_SIZE))
         title = QLabel("PourSend")
+        self.brand_title = title
         title.setObjectName("AppTitle")
 
         self.search = QLineEdit()
@@ -387,18 +435,12 @@ class MainWindow(QMainWindow):
         configure_combo(self.sort_direction_combo, LayoutMetrics.SORT_DIRECTION_MIN_WIDTH)
         self.sort_direction_combo.currentIndexChanged.connect(self.refresh_table)
 
-        add_button = icon_button("Add Recipient", "add", PRIMARY_BUTTON)
-        paste_button = icon_button("Paste List", "clipboard")
-        import_button = icon_button("Import File", "file-up")
-        copy_button = icon_button("Copy", "copy")
-        export_button = icon_button("Export", "download")
-        more_button = icon_button("More", "more", SUBTLE_BUTTON)
-        add_button.setMinimumWidth(LayoutMetrics.BUTTON_MIN_WIDTHS["add"])
-        paste_button.setMinimumWidth(LayoutMetrics.BUTTON_MIN_WIDTHS["paste"])
-        import_button.setMinimumWidth(LayoutMetrics.BUTTON_MIN_WIDTHS["import"])
-        copy_button.setMinimumWidth(LayoutMetrics.BUTTON_MIN_WIDTHS["copy"])
-        export_button.setMinimumWidth(LayoutMetrics.BUTTON_MIN_WIDTHS["export"])
-        more_button.setMinimumWidth(LayoutMetrics.BUTTON_MIN_WIDTHS["more"])
+        add_button = icon_button(COMMAND_LABELS["add"][0], "add", PRIMARY_BUTTON)
+        paste_button = icon_button(COMMAND_LABELS["paste"][0], "clipboard")
+        import_button = icon_button(COMMAND_LABELS["import"][0], "file-up")
+        copy_button = icon_button(COMMAND_LABELS["copy"][0], "copy")
+        export_button = icon_button(COMMAND_LABELS["export"][0], "download")
+        more_button = icon_button(COMMAND_LABELS["more"][0], "more", SUBTLE_BUTTON)
         add_button.clicked.connect(self.add_person)
         paste_button.clicked.connect(self.paste_list)
         import_button.clicked.connect(self.import_csv)
@@ -470,51 +512,60 @@ class MainWindow(QMainWindow):
         group_tools.addLayout(group_checked_row)
 
         sidebar = PreferredWidthFrame(LayoutMetrics.SIDEBAR_PREFERRED_WIDTH)
+        self.sidebar = sidebar
         sidebar.setObjectName("Sidebar")
         sidebar.setMinimumWidth(LayoutMetrics.SIDEBAR_MIN_WIDTH)
         sidebar.setMaximumWidth(LayoutMetrics.SIDEBAR_MAX_WIDTH)
         sidebar.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         sidebar.setLayout(group_tools)
 
-        command_bar = QHBoxLayout()
-        command_bar.setContentsMargins(0, 0, 0, 0)
-        command_bar.setSpacing(LayoutMetrics.SPACING_XS)
-        command_bar.addWidget(add_button)
-        command_bar.addWidget(paste_button)
-        command_bar.addWidget(import_button)
-        command_bar.addSpacing(LayoutMetrics.SPACING_XS)
-        command_bar.addWidget(copy_button)
-        command_bar.addWidget(export_button)
-        command_bar.addWidget(more_button)
+        self.command_buttons = [
+            ("add", add_button),
+            ("paste", paste_button),
+            ("import", import_button),
+            ("copy", copy_button),
+            ("export", export_button),
+            ("more", more_button),
+        ]
+        self.command_icons = {key: button.icon() for key, button in self.command_buttons}
+        self.command_bar = QGridLayout()
+        self.command_bar.setContentsMargins(0, 0, 0, 0)
+        self.command_bar.setHorizontalSpacing(LayoutMetrics.SPACING_XS)
+        self.command_bar.setVerticalSpacing(LayoutMetrics.SPACING_XS)
+        self.command_bar_built = False
 
         brand = QWidget()
-        brand.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        brand_layout = QHBoxLayout(brand)
-        brand_layout.setContentsMargins(0, 0, 0, 0)
-        brand_layout.setSpacing(LayoutMetrics.BRAND_GAP)
-        brand_layout.addWidget(app_icon)
-        brand_layout.addWidget(title, alignment=Qt.AlignVCenter)
+        self.brand = brand
+        brand.setObjectName("BrandLockup")
+        brand.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.brand_layout = QHBoxLayout(brand)
+        self.brand_layout.setContentsMargins(0, 0, 0, 0)
+        self.brand_layout.setSpacing(LayoutMetrics.BRAND_GAP)
+        self.brand_layout.addWidget(app_icon)
+        self.brand_layout.addWidget(title, alignment=Qt.AlignVCenter)
+        brand.setFixedSize(brand.sizeHint())
 
         command_widget = QWidget()
+        self.command_widget = command_widget
         command_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        command_widget.setLayout(command_bar)
+        command_widget.setLayout(self.command_bar)
 
         header = QFrame()
+        self.header = header
         header.setObjectName("Header")
         header.setMinimumHeight(LayoutMetrics.HEADER_MIN_HEIGHT)
-        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(
+        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.header_layout = QHBoxLayout(header)
+        self.header_layout.setContentsMargins(
             LayoutMetrics.HEADER_MARGIN_X,
             LayoutMetrics.HEADER_MARGIN_Y,
             LayoutMetrics.HEADER_MARGIN_RIGHT,
             LayoutMetrics.HEADER_MARGIN_Y,
         )
-        header_layout.setSpacing(LayoutMetrics.SPACING_LG)
-        header_layout.addWidget(brand)
-        header_layout.addStretch(1)
-        header_layout.addWidget(self.search, stretch=2)
-        header_layout.addWidget(command_widget)
+        self.header_layout.setSpacing(LayoutMetrics.SPACING_LG)
+        self.header_layout.addWidget(brand)
+        self.header_layout.addWidget(self.search, stretch=2)
+        self.header_layout.addWidget(command_widget)
 
         self.workspace_title = ElidedLabel("All Recipients")
         self.workspace_title.setObjectName("WorkspaceTitle")
@@ -656,9 +707,10 @@ class MainWindow(QMainWindow):
         action_layout.setContentsMargins(LayoutMetrics.SPACING_MD, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_MD, LayoutMetrics.SPACING_SM)
         action_layout.setSpacing(LayoutMetrics.SPACING_SM)
         self.selection_actions = QWidget()
-        selection_layout = QHBoxLayout(self.selection_actions)
+        selection_layout = QGridLayout(self.selection_actions)
         selection_layout.setContentsMargins(0, 0, 0, 0)
-        selection_layout.setSpacing(LayoutMetrics.SPACING_SM)
+        selection_layout.setHorizontalSpacing(LayoutMetrics.SPACING_SM)
+        selection_layout.setVerticalSpacing(LayoutMetrics.SPACING_SM)
         self.select_all_button = mark_button(QPushButton("Select All in This Group"), SUBTLE_BUTTON)
         self.deselect_all_button = mark_button(QPushButton("Deselect All in This Group"), SUBTLE_BUTTON)
         self.edit_button = mark_button(QPushButton("Edit Recipient"), SECONDARY_BUTTON)
@@ -672,9 +724,10 @@ class MainWindow(QMainWindow):
         self.bulk_count_label = QLabel("0 recipients checked")
         self.bulk_count_label.setObjectName("BulkCount")
         self.bulk_actions = QWidget()
-        bulk_layout = QHBoxLayout(self.bulk_actions)
+        bulk_layout = QGridLayout(self.bulk_actions)
         bulk_layout.setContentsMargins(0, 0, 0, 0)
-        bulk_layout.setSpacing(LayoutMetrics.SPACING_SM)
+        bulk_layout.setHorizontalSpacing(LayoutMetrics.SPACING_SM)
+        bulk_layout.setVerticalSpacing(LayoutMetrics.SPACING_SM)
         bulk_copy_button = icon_button("Copy", "clipboard")
         bulk_set_button = icon_button("Set Groups", "tag")
         bulk_add_button = icon_button("Add to Group", "user-add")
@@ -685,52 +738,45 @@ class MainWindow(QMainWindow):
         bulk_add_button.clicked.connect(self.assign_checked_to_group)
         bulk_remove_button.clicked.connect(self.remove_checked_from_current_group)
         bulk_delete_button.clicked.connect(self.delete_selected)
-        selection_layout.addWidget(self.select_all_button)
-        selection_layout.addWidget(self.deselect_all_button)
-        selection_layout.addWidget(self.edit_button)
-        selection_layout.addStretch(1)
-        bulk_layout.addWidget(self.bulk_count_label)
-        bulk_layout.addStretch(1)
-        bulk_layout.addWidget(bulk_copy_button)
-        bulk_layout.addWidget(bulk_add_button)
-        bulk_layout.addWidget(bulk_set_button)
-        bulk_layout.addWidget(bulk_remove_button)
-        bulk_layout.addWidget(bulk_delete_button)
+        self.selection_layout = selection_layout
+        self.bulk_layout = bulk_layout
+        self.bulk_action_buttons = [bulk_copy_button, bulk_add_button, bulk_set_button, bulk_remove_button, bulk_delete_button]
+        self.action_bar_columns = 0
         action_layout.addWidget(self.selection_actions)
         action_layout.addWidget(self.bulk_actions)
 
         workspace = QFrame()
         workspace.setObjectName("Workspace")
         workspace.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        workspace_layout = QVBoxLayout(workspace)
-        workspace_layout.setContentsMargins(
+        self.workspace_layout = QVBoxLayout(workspace)
+        self.workspace_layout.setContentsMargins(
             LayoutMetrics.PANEL_MARGIN_X,
             LayoutMetrics.PANEL_MARGIN_Y,
             LayoutMetrics.PANEL_MARGIN_X,
             LayoutMetrics.PANEL_MARGIN_Y,
         )
-        workspace_layout.setSpacing(LayoutMetrics.SPACING_LG)
-        workspace_layout.addLayout(workspace_heading)
-        workspace_layout.addLayout(filter_bar)
-        workspace_layout.addWidget(self.table_stack, stretch=1)
-        workspace_layout.addWidget(self.action_bar)
+        self.workspace_layout.setSpacing(LayoutMetrics.SPACING_LG)
+        self.workspace_layout.addLayout(workspace_heading)
+        self.workspace_layout.addLayout(filter_bar)
+        self.workspace_layout.addWidget(self.table_stack, stretch=1)
+        self.workspace_layout.addWidget(self.action_bar)
 
-        body = QHBoxLayout()
-        body.setContentsMargins(
+        self.body_layout = QHBoxLayout()
+        self.body_layout.setContentsMargins(
             LayoutMetrics.PAGE_MARGIN_X,
             LayoutMetrics.PAGE_MARGIN_Y,
             LayoutMetrics.PAGE_MARGIN_X,
             LayoutMetrics.PAGE_MARGIN_Y,
         )
-        body.setSpacing(LayoutMetrics.SPACING_LG)
-        body.addWidget(sidebar)
-        body.addWidget(workspace, stretch=1)
+        self.body_layout.setSpacing(LayoutMetrics.SPACING_LG)
+        self.body_layout.addWidget(sidebar)
+        self.body_layout.addWidget(workspace, stretch=1)
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         main_layout.addWidget(header)
-        main_layout.addLayout(body, stretch=1)
+        main_layout.addLayout(self.body_layout, stretch=1)
 
         root = QWidget()
         root.setObjectName("AppRoot")
@@ -743,6 +789,7 @@ class MainWindow(QMainWindow):
         self.main_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.main_scroll_area.setWidget(root)
         self.setCentralWidget(self.main_scroll_area)
+        self.arrange_responsive_layout()
 
         self.addAction(self._shortcut("Ctrl+N", self.add_person))
 
@@ -917,30 +964,140 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        self.arrange_responsive_layout()
         if hasattr(self, "filter_bar"):
             self.arrange_filter_toolbar()
         if hasattr(self, "table"):
             self.resize_table_columns()
 
-    def arrange_filter_toolbar(self) -> None:
-        estimated_content_width = (
-            self.width()
-            - LayoutMetrics.SIDEBAR_PREFERRED_WIDTH
-            - LayoutMetrics.PAGE_MARGIN_X * 2
-            - LayoutMetrics.SPACING_LG
-            - LayoutMetrics.PANEL_MARGIN_X * 2
-        )
-        available_width = max(0, estimated_content_width)
-        if hasattr(self, "table_stack") and self.table_stack.width() > 0:
-            available_width = max(available_width, self.table_stack.width())
-        elif hasattr(self, "table") and self.table.viewport().width() > 0:
-            available_width = max(available_width, self.table.viewport().width())
-        if available_width >= LayoutMetrics.FILTER_WIDE_WIDTH:
-            columns = LayoutMetrics.FILTER_COLUMNS_WIDE
-        elif available_width >= LayoutMetrics.FILTER_MEDIUM_WIDTH:
-            columns = LayoutMetrics.FILTER_COLUMNS_MEDIUM
+    def arrange_responsive_layout(self) -> None:
+        width = self.responsive_width()
+        self.update_brand_lockup()
+        if hasattr(self, "command_bar"):
+            self.arrange_command_bar()
+        if hasattr(self, "selection_layout"):
+            self.arrange_action_bar()
+        if hasattr(self, "header_layout"):
+            margin_x = fluid_value(width, LayoutMetrics.SPACING_LG, LayoutMetrics.HEADER_MARGIN_X)
+            margin_y = fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.HEADER_MARGIN_Y)
+            self.header_layout.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+            self.header_layout.setSpacing(fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_LG))
+        if hasattr(self, "header"):
+            logo_size = self.app_icon.height() if hasattr(self, "app_icon") else LayoutMetrics.LOGO_SIZE
+            self.header.setMinimumHeight(max(LayoutMetrics.HEADER_MIN_HEIGHT, logo_size + margin_y * 2))
+        if hasattr(self, "body_layout"):
+            if hasattr(self, "sidebar"):
+                sidebar_width = clamp(
+                    round(width * 0.185),
+                    140,
+                    LayoutMetrics.SIDEBAR_PREFERRED_WIDTH,
+                )
+                self.sidebar.setMinimumWidth(sidebar_width)
+                self.sidebar.setMaximumWidth(sidebar_width)
+            margin_x = fluid_value(width, LayoutMetrics.SPACING_XS, LayoutMetrics.PAGE_MARGIN_X)
+            margin_y = fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.PAGE_MARGIN_Y)
+            self.body_layout.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+            self.body_layout.setSpacing(fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_LG))
+        if hasattr(self, "workspace_layout"):
+            margin_x = fluid_value(width, LayoutMetrics.SPACING_MD, LayoutMetrics.PANEL_MARGIN_X)
+            margin_y = fluid_value(width, LayoutMetrics.SPACING_MD, LayoutMetrics.PANEL_MARGIN_Y)
+            self.workspace_layout.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+            self.workspace_layout.setSpacing(fluid_value(width, LayoutMetrics.SPACING_MD, LayoutMetrics.SPACING_LG))
+        if hasattr(self, "filter_bar"):
+            self.filter_bar.setHorizontalSpacing(fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_LG))
+            self.filter_bar.setVerticalSpacing(fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_MD))
+
+    def responsive_width(self) -> int:
+        if hasattr(self, "main_scroll_area") and self.main_scroll_area.viewport().width() > 0:
+            return self.main_scroll_area.viewport().width()
+        return self.width()
+
+    def update_brand_lockup(self) -> None:
+        if not hasattr(self, "app_icon"):
+            return
+        width = self.responsive_width()
+        logo_size = fluid_value(width, LayoutMetrics.LOGO_MIN_SIZE, LayoutMetrics.LOGO_SIZE)
+        self.app_icon.setFixedSize(logo_size, logo_size)
+        self.app_icon.setPixmap(logo_pixmap(logo_size))
+        self.brand_layout.setSpacing(fluid_value(width, LayoutMetrics.SPACING_XS, LayoutMetrics.BRAND_GAP))
+        self.brand.setFixedSize(self.brand.sizeHint())
+
+    def arrange_command_bar(self) -> None:
+        if not self.command_bar_built:
+            clear_layout(self.command_bar)
+            for index, (_key, button) in enumerate(self.command_buttons):
+                column = index + (1 if index >= 3 else 0)
+                self.command_bar.addWidget(button, 0, column)
+            self.command_bar_built = True
+        width = self.responsive_width()
+        self.command_bar.setHorizontalSpacing(fluid_value(width, LayoutMetrics.SPACING_XXS, LayoutMetrics.SPACING_XS))
+        self.command_bar.setColumnMinimumWidth(3, fluid_value(width, LayoutMetrics.SPACING_XXS, LayoutMetrics.SPACING_XS))
+        for key, button in self.command_buttons:
+            full_label, _compact_label = COMMAND_LABELS[key]
+            button_width = fluid_value(
+                width,
+                LayoutMetrics.BUTTON_MINIMUM_WIDTHS[key],
+                LayoutMetrics.BUTTON_MIN_WIDTHS[key],
+                wide=1200,
+            )
+            button.setMinimumWidth(button_width)
+            button.setMaximumWidth(button_width)
+            button.setText(self.elided_button_text(button, full_label, button_width))
+            button.setIcon(self.command_icons[key])
+            button.setToolTip(full_label)
+            self.set_dynamic_property(button, "responsiveCommand", button_width < LayoutMetrics.BUTTON_MIN_WIDTHS[key])
+
+    def elided_button_text(self, button: QPushButton, text: str, button_width: int) -> str:
+        icon_space = button.iconSize().width() + LayoutMetrics.SPACING_XS if not button.icon().isNull() else 0
+        text_width = button_width - icon_space - fluid_value(self.responsive_width(), 12, 16)
+        if text_width < button.fontMetrics().horizontalAdvance("W"):
+            return ""
+        return button.fontMetrics().elidedText(text, Qt.ElideRight, text_width)
+
+    def set_dynamic_property(self, widget: QWidget, name: str, value: bool) -> None:
+        if widget.property(name) == value:
+            return
+        widget.setProperty(name, value)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+
+    def arrange_action_bar(self) -> None:
+        available_width = self.available_workspace_width()
+        columns = 5 if available_width >= 900 else 3 if available_width >= 520 else 2
+        if self.action_bar_columns == columns and self.selection_layout.count() and self.bulk_layout.count():
+            return
+        clear_layout(self.selection_layout)
+        clear_layout(self.bulk_layout)
+        for column in range(8):
+            self.selection_layout.setColumnStretch(column, 0)
+            self.bulk_layout.setColumnStretch(column, 0)
+        selection_columns = 3 if columns >= 5 else 2
+        for index, button in enumerate(self.table_action_buttons):
+            self.selection_layout.addWidget(button, index // selection_columns, index % selection_columns)
+        if columns >= 5:
+            self.selection_layout.setColumnStretch(3, 1)
+            self.bulk_layout.addWidget(self.bulk_count_label, 0, 0)
+            self.bulk_layout.setColumnStretch(1, 1)
+            for index, button in enumerate(self.bulk_action_buttons):
+                self.bulk_layout.addWidget(button, 0, index + 2)
         else:
-            columns = LayoutMetrics.FILTER_COLUMNS_NARROW
+            self.bulk_layout.addWidget(self.bulk_count_label, 0, 0, 1, columns)
+            for index, button in enumerate(self.bulk_action_buttons):
+                self.bulk_layout.addWidget(button, 1 + index // columns, index % columns)
+        self.action_bar_columns = columns
+
+    def available_workspace_width(self) -> int:
+        width = self.responsive_width()
+        body_margins = self.body_layout.contentsMargins() if hasattr(self, "body_layout") else None
+        workspace_margins = self.workspace_layout.contentsMargins() if hasattr(self, "workspace_layout") else None
+        sidebar_width = self.sidebar.width() if hasattr(self, "sidebar") else 0
+        body_margin_width = body_margins.left() + body_margins.right() if body_margins else 0
+        workspace_margin_width = workspace_margins.left() + workspace_margins.right() if workspace_margins else 0
+        body_spacing = self.body_layout.spacing() if hasattr(self, "body_layout") else 0
+        return max(0, width - sidebar_width - body_margin_width - body_spacing - workspace_margin_width)
+
+    def arrange_filter_toolbar(self) -> None:
+        columns = LayoutMetrics.FILTER_COLUMNS
         if columns == self.filter_bar_columns:
             return
         while self.filter_bar.count():
@@ -951,7 +1108,7 @@ class MainWindow(QMainWindow):
             row = index // columns
             column = index % columns
             self.filter_bar.addWidget(group, row, column)
-        for column in range(LayoutMetrics.FILTER_COLUMNS_WIDE):
+        for column in range(LayoutMetrics.FILTER_COLUMNS):
             self.filter_bar.setColumnStretch(column, 1 if column < columns else 0)
         self.filter_bar_columns = columns
 
@@ -959,23 +1116,27 @@ class MainWindow(QMainWindow):
         viewport_width = self.table.viewport().width()
         if viewport_width <= 0:
             return
-        select_width = LayoutMetrics.TABLE_SELECT_WIDTH
-        status_width = LayoutMetrics.TABLE_STATUS_WIDTH
-        phone_width = min(
-            LayoutMetrics.TABLE_PHONE_MAX_WIDTH,
-            max(LayoutMetrics.TABLE_PHONE_MIN_WIDTH, int(viewport_width * 0.22)),
-        )
+        ratio = fluid_ratio(self.width())
+        self.table.horizontalHeader().setMinimumSectionSize(fluid_value(self.width(), 44, 72))
+        select_width = fluid_value(self.width(), 64, LayoutMetrics.TABLE_SELECT_WIDTH)
+        status_width = fluid_value(self.width(), 82, LayoutMetrics.TABLE_STATUS_WIDTH)
+        phone_min = fluid_value(self.width(), 128, LayoutMetrics.TABLE_PHONE_MIN_WIDTH)
+        phone_max = fluid_value(self.width(), 180, LayoutMetrics.TABLE_PHONE_MAX_WIDTH)
+        group_min = fluid_value(self.width(), 96, LayoutMetrics.TABLE_GROUP_MIN_WIDTH)
+        group_max = fluid_value(self.width(), 180, LayoutMetrics.TABLE_GROUP_MAX_WIDTH)
+        notes_min = fluid_value(self.width(), 72, LayoutMetrics.TABLE_NOTES_MIN_WIDTH)
+        group_ratio = 0.45 + (0.72 - 0.45) * ratio
+        phone_width = min(phone_max, max(phone_min, fluid_value(self.width(), 128, 176)))
         available_for_flexible_columns = max(0, viewport_width - select_width - status_width - phone_width - 4)
-        group_width = min(
-            LayoutMetrics.TABLE_GROUP_MAX_WIDTH,
-            max(LayoutMetrics.TABLE_GROUP_MIN_WIDTH, int(available_for_flexible_columns * 0.72)),
-        )
-        if group_width + 120 > available_for_flexible_columns:
-            group_width = max(180, available_for_flexible_columns - 120)
+        group_width = min(group_max, max(group_min, int(available_for_flexible_columns * group_ratio)))
+        if group_width + notes_min > available_for_flexible_columns:
+            group_width = max(group_min, available_for_flexible_columns - notes_min)
         self.table.setColumnWidth(0, select_width)
         self.table.setColumnWidth(1, phone_width)
         self.table.setColumnWidth(2, group_width)
         self.table.setColumnWidth(4, status_width)
+        self.table.updateGeometries()
+        self.table.viewport().update()
 
     def restore_window_geometry(self) -> None:
         saved = self.settings.get("window_geometry")
