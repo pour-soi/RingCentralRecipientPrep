@@ -1,15 +1,18 @@
 # PourSend
 
+[![Latest Release](https://img.shields.io/github/v/release/pour-soi/PourSend?style=flat-square&label=Latest%20Release)](https://github.com/pour-soi/PourSend/releases)
+[![Windows](https://img.shields.io/badge/Windows-Desktop-0078D4?style=flat-square)](https://github.com/pour-soi/PourSend/releases/latest)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square)](https://www.python.org/)
+[![MIT License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/pour-soi/PourSend/build-windows.yml?style=flat-square&label=Windows%20Build)](https://github.com/pour-soi/PourSend/actions/workflows/build-windows.yml)
+
 <p align="center">
   <img src="assets/poursend-logo.png" alt="PourSend official logo" width="260">
 </p>
 
-A local-first Windows desktop app for preparing recipient phone-number lists quickly. PourSend supports multi-group recipients, intelligent duplicate detection, responsive resizing, batch import, search, copy, and export workflows for manual use with RingCentral.
+Prepare recipient lists before sending.
 
-[![Latest Release](https://img.shields.io/github/v/release/pour-soi/PourSend?label=latest%20release)](https://github.com/pour-soi/PourSend/releases/tag/v2.1.2)
-![Windows](https://img.shields.io/badge/platform-Windows-0078D4)
-![Tests](https://img.shields.io/badge/tests-154%20passing-brightgreen)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+A local-first Windows desktop application for intelligent recipient management with multi-group organization, fast copy workflows, and a responsive desktop UI.
 
 Windows desktop app · Local-first data · Multi-group recipients · Fast copy/export workflow
 
