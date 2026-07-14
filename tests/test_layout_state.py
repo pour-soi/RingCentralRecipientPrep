@@ -176,12 +176,20 @@ class LayoutStateTests(unittest.TestCase):
         self.addCleanup(window.close)
 
         for width, height in ((1100, 700), (1000, 650), (900, 600), (800, 540), (720, 480)):
-            window.resize(width, height)
-            window.show()
-            settle_layout(window, self.app)
+            with self.subTest(size=f"{width}x{height}"):
+                window.resize(width, height)
+                window.show()
+                settle_layout(window, self.app)
 
-            self.assertEqual(window.main_scroll_area.horizontalScrollBar().maximum(), 0)
-            self.assertGreater(window.main_scroll_area.verticalScrollBar().maximum(), 0)
+                hscroll = window.main_scroll_area.horizontalScrollBar().maximum()
+                diagnostic = (
+                    f"root={window.main_scroll_area.widget().minimumSizeHint().toTuple()} "
+                    f"viewport={window.main_scroll_area.viewport().size().toTuple()} "
+                    f"brand={window.brand.width()} sidebar={window.sidebar.width()} "
+                    f"content={window.table_stack.width()} action={window.action_bar.sizeHint().toTuple()}"
+                )
+                self.assertEqual(hscroll, 0, diagnostic)
+                self.assertGreater(window.main_scroll_area.verticalScrollBar().maximum(), 0)
 
     def test_sidebar_and_table_columns_resize_fluidly(self):
         window = self.make_window([recipient("+14151111111"), recipient("+16282222222", selected=True)])
