@@ -266,7 +266,7 @@ def control_group(label_text: str, control: QWidget) -> QWidget:
     label.setObjectName("FilterLabel")
     group = QWidget()
     group.setMinimumWidth(0)
-    group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    group.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
     layout = QVBoxLayout(group)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(LayoutMetrics.SPACING_XS)
