@@ -720,7 +720,9 @@ class MainWindow(QMainWindow):
         self.table_action_buttons = [self.select_all_button, self.deselect_all_button, self.edit_button]
         for button in self.table_action_buttons:
             button.setMinimumHeight(LayoutMetrics.CONTROL_HEIGHT)
-            button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+            button.setMinimumWidth(0)
+            button.setToolTip(button.text())
+            button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.bulk_count_label = QLabel("0 recipients checked")
         self.bulk_count_label.setObjectName("BulkCount")
         self.bulk_actions = QWidget()
@@ -741,6 +743,10 @@ class MainWindow(QMainWindow):
         self.selection_layout = selection_layout
         self.bulk_layout = bulk_layout
         self.bulk_action_buttons = [bulk_copy_button, bulk_add_button, bulk_set_button, bulk_remove_button, bulk_delete_button]
+        for button in self.bulk_action_buttons:
+            button.setMinimumWidth(0)
+            button.setToolTip(button.text())
+            button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.action_bar_columns = 0
         action_layout.addWidget(self.selection_actions)
         action_layout.addWidget(self.bulk_actions)
