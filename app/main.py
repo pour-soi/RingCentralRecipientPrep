@@ -276,7 +276,7 @@ def control_group(label_text: str, control: QWidget) -> QWidget:
 
 
 def configure_combo(combo: QComboBox, minimum_width: int) -> QComboBox:
-    combo.setMinimumWidth(min(96, minimum_width))
+    combo.setMinimumWidth(0)
     combo.setMinimumContentsLength(8)
     combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
     combo.setMinimumHeight(LayoutMetrics.CONTROL_HEIGHT)
