@@ -61,6 +61,16 @@ jobs:
       - name: Build executable
         run: pyinstaller --noconfirm --onefile --windowed --name PourSend --icon assets/poursend.ico --add-data "assets;assets" main.py
 
+      - name: Smoke test executable startup
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath "dist/PourSend.exe" -PassThru
+          Start-Sleep -Seconds 15
+          if ($process.HasExited) {
+            throw "PourSend.exe exited during startup smoke test with code $($process.ExitCode)."
+          }
+          Stop-Process -Id $process.Id -Force
+
       - name: Create portable package
         shell: pwsh
         run: |
