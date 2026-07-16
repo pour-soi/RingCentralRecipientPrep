@@ -410,7 +410,7 @@ class CsvColumnDialog(QDialog):
 class DeleteConfirmationDialog(QDialog):
     def __init__(self, count: int, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Delete recipients")
+        self.setWindowTitle("Delete selected recipients")
         self.setMinimumWidth(380)
 
         surface = QFrame()
@@ -419,7 +419,7 @@ class DeleteConfirmationDialog(QDialog):
         surface_layout.setContentsMargins(16, 16, 16, 16)
         surface_layout.setSpacing(12)
         noun = "recipient" if count == 1 else "recipients"
-        add_dialog_header(surface_layout, "Delete recipients", f"Delete {count} {noun}? This cannot be undone.")
+        add_dialog_header(surface_layout, "Delete selected recipients", f"Delete {count} selected {noun}? This cannot be undone.")
 
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
         buttons.button(QDialogButtonBox.Ok).setText("Delete")

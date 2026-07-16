@@ -323,6 +323,10 @@ def clamp(value: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, value))
 
 
+def is_checked_state(value) -> bool:
+    return getattr(value, "value", value) == Qt.Checked.value
+
+
 class RecipientTableDelegate(QStyledItemDelegate):
     def paint(self, painter: QPainter, option, index) -> None:
         painter.save()
@@ -340,7 +344,7 @@ class RecipientTableDelegate(QStyledItemDelegate):
 
         if index.column() == 0:
             check_state = index.data(Qt.CheckStateRole)
-            checked = getattr(check_state, "value", check_state) == Qt.Checked.value
+            checked = is_checked_state(check_state)
             box_size = 20
             box = QRect(
                 rect.x() + (rect.width() - box_size) // 2,
@@ -372,7 +376,7 @@ class RecipientTableDelegate(QStyledItemDelegate):
         if event.type() == QEvent.KeyPress and event.key() not in (Qt.Key_Space, Qt.Key_Select):
             return False
         current = index.data(Qt.CheckStateRole)
-        model.setData(index, Qt.Unchecked if current == Qt.Checked else Qt.Checked, Qt.CheckStateRole)
+        model.setData(index, Qt.Unchecked if is_checked_state(current) else Qt.Checked, Qt.CheckStateRole)
         return True
 
 
@@ -613,6 +617,8 @@ class MainWindow(QMainWindow):
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_recipient_context_menu)
         self.table.setItemDelegate(RecipientTableDelegate(self.table))
         table_header = self.table.horizontalHeader()
         table_header.setFixedHeight(LayoutMetrics.TABLE_HEADER_HEIGHT)
@@ -712,8 +718,8 @@ class MainWindow(QMainWindow):
         selection_layout.setContentsMargins(0, 0, 0, 0)
         selection_layout.setHorizontalSpacing(LayoutMetrics.SPACING_SM)
         selection_layout.setVerticalSpacing(LayoutMetrics.SPACING_SM)
-        self.select_all_button = mark_button(QPushButton("Select All in This Group"), SUBTLE_BUTTON)
-        self.deselect_all_button = mark_button(QPushButton("Deselect All in This Group"), SUBTLE_BUTTON)
+        self.select_all_button = mark_button(QPushButton("Select All"), SUBTLE_BUTTON)
+        self.deselect_all_button = mark_button(QPushButton("Clear Selection"), SUBTLE_BUTTON)
         self.edit_button = mark_button(QPushButton("Edit Recipient"), SECONDARY_BUTTON)
         self.select_all_button.clicked.connect(lambda: self.set_all_visible(True))
         self.deselect_all_button.clicked.connect(lambda: self.set_all_visible(False))
@@ -735,7 +741,7 @@ class MainWindow(QMainWindow):
         bulk_set_button = icon_button("Set Groups", "tag")
         bulk_add_button = icon_button("Add to Group", "user-add")
         bulk_remove_button = icon_button("Remove from Group", "user-minus")
-        bulk_delete_button = icon_button("Delete", "trash", DANGER_BUTTON, "#d24b4b")
+        bulk_delete_button = icon_button("Delete Selected...", "trash", DANGER_BUTTON, "#d24b4b")
         bulk_copy_button.clicked.connect(self.copy_selected)
         bulk_set_button.clicked.connect(self.batch_edit_checked)
         bulk_add_button.clicked.connect(self.assign_checked_to_group)
@@ -819,9 +825,14 @@ class MainWindow(QMainWindow):
             self.search.setFocus()
             return True
         if event.matches(QKeySequence.SelectAll):
-            if editable_text_widget_has_focus():
+            if editable_text_widget_has_focus() or not self.recipient_table_has_focus():
                 return False
             self.set_all_visible(True)
+            return True
+        if event.key() == Qt.Key_A and event.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+            if editable_text_widget_has_focus() or not self.recipient_table_has_focus():
+                return False
+            self.set_all_visible(False)
             return True
         if event.matches(QKeySequence.Undo):
             if editable_text_widget_has_focus():
@@ -829,9 +840,9 @@ class MainWindow(QMainWindow):
             self.undo_last_import()
             return True
         if event.key() == Qt.Key_Delete and event.modifiers() == Qt.NoModifier:
-            if editable_text_widget_has_focus():
+            if editable_text_widget_has_focus() or not self.recipient_table_has_focus():
                 return False
-            self.delete_selected()
+            self.delete_highlighted_recipient()
             return True
 
         return super().eventFilter(watched, event)
@@ -839,6 +850,10 @@ class MainWindow(QMainWindow):
     def shortcut_focus_is_inside_window(self) -> bool:
         focused = QApplication.focusWidget()
         return focused is None or focused is self or self.isAncestorOf(focused)
+
+    def recipient_table_has_focus(self) -> bool:
+        focused = QApplication.focusWidget()
+        return focused is self.table or focused is self.table.viewport() or self.table.isAncestorOf(focused)
 
     def current_group_filter(self) -> str:
         item = self.group_list.currentItem()
@@ -938,7 +953,7 @@ class MainWindow(QMainWindow):
             recipient = self.recipients[index]
             self.table.setVerticalHeaderItem(row, QTableWidgetItem(str(index)))
             checked = QTableWidgetItem("")
-            checked.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
+            checked.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
             checked.setCheckState(Qt.Checked if recipient.get("selected") else Qt.Unchecked)
             checked.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 0, checked)
@@ -1276,6 +1291,16 @@ class MainWindow(QMainWindow):
     def checked_recipient_indexes(self) -> list[int]:
         return checked_recipient_indexes_for_bulk(self.recipients)
 
+    def show_recipient_context_menu(self, position) -> None:
+        row = self.table.rowAt(position.y())
+        if row < 0:
+            return
+        self.table.selectRow(row)
+        menu = QMenu(self.table)
+        menu.addAction("Edit", self.edit_selected)
+        menu.addAction("Delete...", self.delete_highlighted_recipient)
+        menu.exec(self.table.viewport().mapToGlobal(position))
+
     def add_person(self) -> None:
         dialog = PersonDialog(self, groups=self.groups, selected_group=self.preferred_group())
         if dialog.exec() != PersonDialog.Accepted:
@@ -1507,7 +1532,29 @@ class MainWindow(QMainWindow):
             return
         for index in sorted(indexes, reverse=True):
             del self.recipients[index]
-        self.save_and_update()
+        self.save_and_update(selected_group=self.current_group_filter())
+
+    def delete_highlighted_recipient(self) -> None:
+        index = self.selected_visible_index()
+        if index is None:
+            QMessageBox.information(self, "Delete recipient", "Select one recipient to delete.")
+            return
+        self.delete_recipient_at_index(index)
+
+    def delete_recipient_at_index(self, index: int) -> None:
+        if not 0 <= index < len(self.recipients):
+            return
+        phone = str(self.recipients[index].get("phone", ""))
+        display_phone = format_phone_number(phone, self.current_phone_format())
+        answer = QMessageBox.question(
+            self,
+            "Delete this recipient?",
+            f"Delete recipient {display_phone}?\n\nThis cannot be undone.",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        del self.recipients[index]
+        self.save_and_update(selected_group=self.current_group_filter())
 
     def set_all_visible(self, selected: bool) -> None:
         set_selected(self.recipients, [index for index in self.checked_or_visible_indexes()], selected)
