@@ -108,7 +108,7 @@ class LayoutStateTests(unittest.TestCase):
         self.assertEqual(sizes[-1], LayoutMetrics.LOGO_MIN_SIZE)
         self.assertGreater(len(set(sizes)), 3)
 
-    def test_populated_table_shows_selection_controls_above_table(self):
+    def test_populated_table_shows_recipient_action_access(self):
         window = self.make_window([recipient("+14151111111"), recipient("+16282222222")])
         self.addCleanup(window.close)
         window.resize(1200, 800)
@@ -116,10 +116,10 @@ class LayoutStateTests(unittest.TestCase):
         settle_layout(window, self.app)
 
         self.assertIs(window.table_stack.currentWidget(), window.table)
-        self.assertFalse(window.selection_actions.isHidden())
         self.assertLess(window.workspace_layout.indexOf(window.selection_actions), window.workspace_layout.indexOf(window.table_stack))
         self.assertTrue(window.action_bar.isHidden())
         self.assertTrue(window.bulk_actions.isHidden())
+        self.assertNotEqual(window.selection_actions.isHidden(), window.recipient_actions_button.isHidden())
         self.assertTrue(window.select_all_button.isEnabled())
         self.assertFalse(window.deselect_all_button.isEnabled())
         self.assertFalse(window.edit_button.isEnabled())
@@ -132,8 +132,12 @@ class LayoutStateTests(unittest.TestCase):
         window.show()
         settle_layout(window, self.app)
 
-        self.assertFalse(window.action_bar.isHidden())
-        self.assertFalse(window.bulk_actions.isHidden())
+        if window.compact_recipient_actions:
+            self.assertTrue(window.action_bar.isHidden())
+            self.assertTrue(window.menu_delete_selected_action.isEnabled())
+        else:
+            self.assertFalse(window.action_bar.isHidden())
+            self.assertFalse(window.bulk_actions.isHidden())
         self.assertEqual(window.bulk_count_label.text(), "1 recipient checked")
         self.assertIn("Add Checked to Group", [button.text() for button in window.bulk_action_buttons])
         self.assertIn("Remove Checked from Group", [button.text() for button in window.bulk_action_buttons])
@@ -207,7 +211,7 @@ class LayoutStateTests(unittest.TestCase):
         window = self.make_window([recipient("+14151111111", selected=True), recipient("+16282222222")])
         self.addCleanup(window.close)
 
-        window.resize(1200, 800)
+        window.resize(2400, 1000)
         window.show()
         settle_layout(window, self.app)
         self.assertFalse(window.compact_recipient_actions)
@@ -219,7 +223,7 @@ class LayoutStateTests(unittest.TestCase):
         self.assertTrue(window.recipient_actions_button.isVisible())
         self.assertTrue(window.selection_actions.isHidden())
 
-        window.resize(1200, 800)
+        window.resize(2400, 1000)
         settle_layout(window, self.app)
         self.assertFalse(window.compact_recipient_actions)
         self.assertTrue(window.selection_actions.isVisible())
