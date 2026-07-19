@@ -22,9 +22,9 @@ This is an independent, unofficial utility and is not affiliated with or endorse
 
 ## Download
 
-**Current release: v2.1.3**
+**Current release: v2.1.4**
 
-1. Download `PourSend-v2.1.3-Windows.zip` from the [official v2.1.3 GitHub Release](https://github.com/pour-soi/PourSend/releases/tag/v2.1.3).
+1. Download `PourSend-v2.1.4-Windows.zip` from the [official v2.1.4 GitHub Release](https://github.com/pour-soi/PourSend/releases/tag/v2.1.4).
 2. Extract the complete zip file to a normal folder, such as Desktop or Documents.
 3. Run `PourSend.exe` from the extracted folder.
 
