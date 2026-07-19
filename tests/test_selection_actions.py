@@ -235,6 +235,80 @@ class SelectionActionTests(unittest.TestCase):
         self.assertFalse(handled)
         self.assertEqual(checked_recipient_indexes(window.recipients), [])
 
+    def test_action_states_follow_highlight_checks_search_group_and_deletion(self):
+        window = self.make_window()
+        self.addCleanup(window.close)
+
+        self.assertFalse(window.menu_edit_action.isEnabled())
+        self.assertFalse(window.menu_delete_recipient_action.isEnabled())
+        self.assertFalse(window.menu_delete_selected_action.isEnabled())
+        self.assertTrue(window.menu_select_all_action.isEnabled())
+        self.assertFalse(window.menu_clear_selection_action.isEnabled())
+
+        window.table.selectRow(0)
+        self.app.processEvents()
+        self.assertTrue(window.menu_edit_action.isEnabled())
+        self.assertTrue(window.menu_delete_recipient_action.isEnabled())
+
+        window.table.item(0, 0).setCheckState(Qt.Checked)
+        self.app.processEvents()
+        self.assertTrue(window.menu_delete_selected_action.isEnabled())
+        self.assertTrue(window.menu_clear_selection_action.isEnabled())
+        self.assertFalse(window.menu_edit_action.isEnabled())
+
+        window.search.setText("707")
+        self.app.processEvents()
+        self.assertTrue(window.menu_select_all_action.isEnabled())
+        self.assertFalse(window.menu_clear_selection_action.isEnabled())
+        self.assertTrue(window.menu_delete_selected_action.isEnabled())
+
+        window.search.clear()
+        self.select_group(window, "Follow-up")
+        self.app.processEvents()
+        self.assertFalse(window.menu_clear_selection_action.isEnabled())
+        self.assertTrue(window.menu_delete_selected_action.isEnabled())
+        self.assertFalse(window.menu_edit_action.isEnabled())
+
+        with patch("app.main.DeleteConfirmationDialog") as confirmation:
+            confirmation.Accepted = QDialog.Accepted
+            confirmation.return_value.exec.return_value = QDialog.Accepted
+            window.delete_selected()
+
+        self.assertFalse(window.menu_delete_selected_action.isEnabled())
+        self.assertFalse(window.menu_clear_selection_action.isEnabled())
+
+    def test_search_clears_highlight_but_preserves_checked_recipients_for_deletion(self):
+        window = self.make_window()
+        self.addCleanup(window.close)
+
+        window.table.selectRow(0)
+        self.assertEqual(window.selected_visible_index(), 0)
+
+        window.table.item(1, 0).setCheckState(Qt.Checked)
+        window.table.item(2, 0).setCheckState(Qt.Checked)
+        self.app.processEvents()
+        self.assertEqual(checked_recipient_indexes(window.recipients), [1, 2])
+
+        window.search.setText("628")
+        self.app.processEvents()
+        self.assertIsNone(window.selected_visible_index())
+        self.assertEqual(checked_recipient_indexes(window.recipients), [1, 2])
+
+        window.search.clear()
+        self.app.processEvents()
+        self.assertIsNone(window.selected_visible_index())
+        self.assertFalse(window.menu_edit_action.isEnabled())
+        self.assertFalse(window.menu_delete_recipient_action.isEnabled())
+        self.assertTrue(window.menu_delete_selected_action.isEnabled())
+
+        with patch("app.main.DeleteConfirmationDialog") as confirmation:
+            confirmation.Accepted = QDialog.Accepted
+            confirmation.return_value.exec.return_value = QDialog.Accepted
+            window.delete_selected()
+
+        self.assertEqual([recipient["phone"] for recipient in window.recipients], ["+14151111111"])
+        self.assertIsNone(window.selected_visible_index())
+
     def test_empty_state_after_deleting_last_recipient(self):
         window = self.make_window()
         self.addCleanup(window.close)

@@ -30,6 +30,11 @@ def settle_layout(window: MainWindow, app: QApplication) -> None:
         app.processEvents()
 
 
+def widget_is_inside_window(window: MainWindow, widget: QWidget) -> bool:
+    top_left = widget.mapTo(window, widget.rect().topLeft())
+    return window.rect().contains(QRect(top_left, widget.size()))
+
+
 class LayoutStateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -106,17 +111,26 @@ class LayoutStateTests(unittest.TestCase):
     def test_populated_table_shows_selection_controls_above_table(self):
         window = self.make_window([recipient("+14151111111"), recipient("+16282222222")])
         self.addCleanup(window.close)
+        window.resize(1200, 800)
+        window.show()
+        settle_layout(window, self.app)
 
         self.assertIs(window.table_stack.currentWidget(), window.table)
         self.assertFalse(window.selection_actions.isHidden())
         self.assertLess(window.workspace_layout.indexOf(window.selection_actions), window.workspace_layout.indexOf(window.table_stack))
         self.assertTrue(window.action_bar.isHidden())
         self.assertTrue(window.bulk_actions.isHidden())
-        self.assertTrue(all(button.isEnabled() for button in window.table_action_buttons))
+        self.assertTrue(window.select_all_button.isEnabled())
+        self.assertFalse(window.deselect_all_button.isEnabled())
+        self.assertFalse(window.edit_button.isEnabled())
+        self.assertFalse(window.delete_recipient_button.isEnabled())
 
     def test_checked_recipient_enables_bulk_action_row(self):
         window = self.make_window([recipient("+14151111111", selected=True), recipient("+16282222222")])
         self.addCleanup(window.close)
+        window.resize(1200, 800)
+        window.show()
+        settle_layout(window, self.app)
 
         self.assertFalse(window.action_bar.isHidden())
         self.assertFalse(window.bulk_actions.isHidden())
@@ -133,7 +147,106 @@ class LayoutStateTests(unittest.TestCase):
         self.assertIs(window.table_stack.currentWidget(), window.empty_state)
         self.assertTrue(window.empty_actions.isHidden())
         self.assertTrue(window.selection_actions.isHidden())
+        self.assertTrue(window.recipient_actions_button.isHidden())
         self.assertTrue(window.action_bar.isHidden())
+
+    def test_core_recipient_actions_remain_reachable_at_supported_sizes(self):
+        window = self.make_window([recipient("+14151111111", selected=True), recipient("+16282222222")])
+        self.addCleanup(window.close)
+        expected_menu_actions = [
+            "Edit Recipient",
+            "Delete Recipient...",
+            "Select All",
+            "Clear Selection",
+            "Copy Selected",
+            "Add to Group",
+            "Set Groups",
+            "Remove from Group",
+            "Delete Selected...",
+        ]
+
+        for width, height in ((1200, 800), (1000, 650), (900, 600), (800, 540), (720, 480), (360, 300)):
+            with self.subTest(size=f"{width}x{height}"):
+                window.resize(width, height)
+                window.show()
+                settle_layout(window, self.app)
+                window.table.selectRow(0)
+                self.app.processEvents()
+
+                self.assertEqual(window.main_scroll_area.horizontalScrollBar().maximum(), 0)
+                self.assertFalse(window.main_scroll_area.horizontalScrollBar().isVisible())
+                if window.compact_recipient_actions:
+                    self.assertTrue(window.recipient_actions_button.isVisible())
+                    self.assertTrue(widget_is_inside_window(window, window.recipient_actions_button))
+                    self.assertGreaterEqual(
+                        window.recipient_actions_button.width(),
+                        window.recipient_actions_button.minimumSizeHint().width(),
+                    )
+                    menu_actions = window.recipient_actions_menu.actions()
+                    self.assertEqual([action.text() for action in menu_actions if not action.isSeparator()], expected_menu_actions)
+                    self.assertEqual(sum(action.isSeparator() for action in menu_actions), 2)
+                    heading_layout = window.workspace_layout.itemAt(0).layout()
+                    self.assertIsNotNone(heading_layout)
+                    self.assertGreaterEqual(heading_layout.indexOf(window.recipient_actions_button), 0)
+                    self.assertTrue(window.selection_actions.isHidden())
+                    self.assertTrue(window.action_bar.isHidden())
+                else:
+                    self.assertTrue(window.selection_actions.isVisible())
+                    self.assertTrue(widget_is_inside_window(window, window.selection_actions))
+                    for button in window.table_action_buttons:
+                        self.assertGreater(button.width(), 0)
+                        self.assertTrue(widget_is_inside_window(window, button))
+                    self.assertTrue(window.action_bar.isVisible())
+                    self.assertTrue(widget_is_inside_window(window, window.action_bar))
+                    for button in window.bulk_action_buttons:
+                        self.assertGreaterEqual(button.width(), button.minimumSizeHint().width())
+                        self.assertTrue(widget_is_inside_window(window, button))
+                    self.assertTrue(window.recipient_actions_button.isHidden())
+
+    def test_resizing_wide_to_compact_and_back_preserves_action_access(self):
+        window = self.make_window([recipient("+14151111111", selected=True), recipient("+16282222222")])
+        self.addCleanup(window.close)
+
+        window.resize(1200, 800)
+        window.show()
+        settle_layout(window, self.app)
+        self.assertFalse(window.compact_recipient_actions)
+        self.assertTrue(window.selection_actions.isVisible())
+
+        window.resize(720, 480)
+        settle_layout(window, self.app)
+        self.assertTrue(window.compact_recipient_actions)
+        self.assertTrue(window.recipient_actions_button.isVisible())
+        self.assertTrue(window.selection_actions.isHidden())
+
+        window.resize(1200, 800)
+        settle_layout(window, self.app)
+        self.assertFalse(window.compact_recipient_actions)
+        self.assertTrue(window.selection_actions.isVisible())
+        self.assertTrue(window.action_bar.isVisible())
+
+    def test_menu_actions_use_the_same_handlers_as_direct_controls(self):
+        window = self.make_window([recipient("+14151111111", selected=True), recipient("+16282222222")])
+        self.addCleanup(window.close)
+        window.table.selectRow(0)
+        window.update_recipient_action_states()
+
+        pairs = (
+            (window.edit_button, window.menu_edit_action, "edit_selected"),
+            (window.delete_recipient_button, window.menu_delete_recipient_action, "delete_highlighted_recipient"),
+            (window.select_all_button, window.menu_select_all_action, "set_all_visible"),
+            (window.deselect_all_button, window.menu_clear_selection_action, "set_all_visible"),
+            (window.bulk_copy_button, window.menu_copy_checked_action, "copy_selected"),
+            (window.bulk_add_button, window.menu_add_checked_action, "assign_checked_to_group"),
+            (window.bulk_set_button, window.menu_set_groups_action, "batch_edit_checked"),
+            (window.bulk_remove_button, window.menu_remove_checked_action, "remove_checked_from_current_group"),
+            (window.bulk_delete_button, window.menu_delete_selected_action, "delete_selected"),
+        )
+        for button, action, handler_name in pairs:
+            with self.subTest(action=action.text()), patch.object(window, handler_name) as handler:
+                button.click()
+                action.trigger()
+                self.assertEqual(handler.call_count, 2)
 
     def test_filter_toolbar_uses_responsive_column_counts(self):
         window = self.make_window([recipient("+14151111111")])
@@ -164,7 +277,7 @@ class LayoutStateTests(unittest.TestCase):
         self.assertLessEqual(window.width(), 620)
         self.assertLessEqual(window.height(), 420)
 
-    def test_small_window_overflow_uses_scroll_area(self):
+    def test_small_window_uses_vertical_overflow_without_horizontal_scrolling(self):
         window = self.make_window([recipient("+14151111111")])
         self.addCleanup(window.close)
 
@@ -173,7 +286,8 @@ class LayoutStateTests(unittest.TestCase):
         self.app.processEvents()
 
         self.assertIs(window.centralWidget(), window.main_scroll_area)
-        self.assertGreater(window.main_scroll_area.horizontalScrollBar().maximum(), 0)
+        self.assertEqual(window.main_scroll_area.horizontalScrollBar().maximum(), 0)
+        self.assertFalse(window.main_scroll_area.horizontalScrollBar().isVisible())
         self.assertGreater(window.main_scroll_area.verticalScrollBar().maximum(), 0)
 
     def test_practical_compact_widths_avoid_horizontal_scrolling(self):
@@ -200,7 +314,6 @@ class LayoutStateTests(unittest.TestCase):
                     f"action={window.action_bar.sizeHint().toTuple()}"
                 )
                 self.assertEqual(hscroll, 0, diagnostic)
-                self.assertGreater(window.main_scroll_area.verticalScrollBar().maximum(), 0)
 
     def test_sidebar_and_table_columns_resize_fluidly(self):
         window = self.make_window([recipient("+14151111111"), recipient("+16282222222", selected=True)])

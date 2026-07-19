@@ -241,6 +241,13 @@ class PreferredWidthFrame(QFrame):
         return hint
 
 
+class ResponsiveRoot(QWidget):
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        hint.setWidth(0)
+        return hint
+
+
 class ElidedLabel(QLabel):
     def __init__(self, text: str = "") -> None:
         super().__init__(text)
@@ -393,6 +400,8 @@ class MainWindow(QMainWindow):
         self.last_imported_numbers: list[str | dict] = []
         self._building_table = False
         self._building_groups = False
+        self.compact_recipient_actions = False
+        self.action_bar_layout_state: tuple[bool, int] | None = None
         apply_app_theme(QApplication.instance())
         self._build_ui()
         self.restore_window_geometry()
@@ -452,6 +461,11 @@ class MainWindow(QMainWindow):
         export_button.clicked.connect(self.export_recipients)
 
         more_menu = QMenu(more_button)
+        more_menu.addAction("Paste List", self.paste_list)
+        more_menu.addAction("Import File", self.import_csv)
+        more_menu.addAction("Copy", self.copy_selected)
+        more_menu.addAction("Export", self.export_recipients)
+        more_menu.addSeparator()
         more_menu.addAction("Undo Last Import", self.undo_last_import)
         more_menu.addSeparator()
         more_menu.addAction("Import Backup", self.import_backup)
@@ -461,6 +475,7 @@ class MainWindow(QMainWindow):
         more_menu.addSeparator()
         more_menu.addAction("Clear All Data", self.clear_all)
         more_button.setMenu(more_menu)
+        self.more_button = more_button
 
         self.group_list = QListWidget()
         self.group_list.currentItemChanged.connect(lambda _current, _previous: self.refresh_table())
@@ -604,7 +619,7 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(False)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(LayoutMetrics.TABLE_ROW_HEIGHT)
-        self.table.setMinimumHeight(LayoutMetrics.TABLE_HEADER_HEIGHT + LayoutMetrics.TABLE_ROW_HEIGHT * 4)
+        self.table.setMinimumHeight(LayoutMetrics.TABLE_HEADER_HEIGHT + LayoutMetrics.TABLE_ROW_HEIGHT)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -620,6 +635,7 @@ class MainWindow(QMainWindow):
         table_header.setSectionResizeMode(3, QHeaderView.Stretch)
         table_header.setSectionResizeMode(4, QHeaderView.Fixed)
         self.table.itemChanged.connect(self.table_item_changed)
+        self.table.itemSelectionChanged.connect(self.update_recipient_action_states)
         self.table.itemDoubleClicked.connect(lambda _item: self.edit_selected())
 
         self.empty_state = QWidget()
@@ -714,10 +730,17 @@ class MainWindow(QMainWindow):
         self.select_all_button = mark_button(QPushButton("Select All"), SUBTLE_BUTTON)
         self.deselect_all_button = mark_button(QPushButton("Clear Selection"), SUBTLE_BUTTON)
         self.edit_button = mark_button(QPushButton("Edit Recipient"), SECONDARY_BUTTON)
+        self.delete_recipient_button = mark_button(QPushButton("Delete Recipient..."), DANGER_BUTTON)
         self.select_all_button.clicked.connect(lambda: self.set_all_visible(True))
         self.deselect_all_button.clicked.connect(lambda: self.set_all_visible(False))
-        self.edit_button.clicked.connect(self.edit_selected)
-        self.table_action_buttons = [self.select_all_button, self.deselect_all_button, self.edit_button]
+        self.edit_button.clicked.connect(lambda _checked=False: self.edit_selected())
+        self.delete_recipient_button.clicked.connect(lambda _checked=False: self.delete_highlighted_recipient())
+        self.table_action_buttons = [
+            self.select_all_button,
+            self.deselect_all_button,
+            self.edit_button,
+            self.delete_recipient_button,
+        ]
         for button in self.table_action_buttons:
             button.setMinimumHeight(LayoutMetrics.CONTROL_HEIGHT)
             button.setMinimumWidth(0)
@@ -732,25 +755,58 @@ class MainWindow(QMainWindow):
         bulk_layout.setContentsMargins(0, 0, 0, 0)
         bulk_layout.setHorizontalSpacing(LayoutMetrics.SPACING_SM)
         bulk_layout.setVerticalSpacing(LayoutMetrics.SPACING_SM)
-        bulk_copy_button = icon_button("Copy", "clipboard")
-        bulk_set_button = icon_button("Set Groups", "tag")
-        bulk_add_button = icon_button("Add Checked to Group", "user-add")
-        bulk_remove_button = icon_button("Remove Checked from Group", "user-minus")
-        bulk_delete_button = icon_button("Delete Selected...", "trash", DANGER_BUTTON, "#d24b4b")
-        bulk_copy_button.clicked.connect(self.copy_selected)
-        bulk_set_button.clicked.connect(self.batch_edit_checked)
-        bulk_add_button.clicked.connect(self.assign_checked_to_group)
-        bulk_remove_button.clicked.connect(self.remove_checked_from_current_group)
-        bulk_delete_button.clicked.connect(self.delete_selected)
+        self.bulk_copy_button = icon_button("Copy", "clipboard")
+        self.bulk_set_button = icon_button("Set Groups", "tag")
+        self.bulk_add_button = icon_button("Add Checked to Group", "user-add")
+        self.bulk_remove_button = icon_button("Remove Checked from Group", "user-minus")
+        self.bulk_delete_button = icon_button("Delete Selected...", "trash", DANGER_BUTTON, "#d24b4b")
+        self.bulk_copy_button.clicked.connect(lambda _checked=False: self.copy_selected())
+        self.bulk_set_button.clicked.connect(lambda _checked=False: self.batch_edit_checked())
+        self.bulk_add_button.clicked.connect(lambda _checked=False: self.assign_checked_to_group())
+        self.bulk_remove_button.clicked.connect(lambda _checked=False: self.remove_checked_from_current_group())
+        self.bulk_delete_button.clicked.connect(lambda _checked=False: self.delete_selected())
         self.selection_layout = selection_layout
         self.bulk_layout = bulk_layout
-        self.bulk_action_buttons = [bulk_copy_button, bulk_add_button, bulk_set_button, bulk_remove_button, bulk_delete_button]
+        self.bulk_action_buttons = [
+            self.bulk_copy_button,
+            self.bulk_add_button,
+            self.bulk_set_button,
+            self.bulk_remove_button,
+            self.bulk_delete_button,
+        ]
         for button in self.bulk_action_buttons:
             button.setMinimumWidth(0)
             button.setToolTip(button.text())
             button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.action_bar_columns = 0
         action_layout.addWidget(self.bulk_actions)
+
+        self.recipient_actions_button = icon_button("Actions", "more", SUBTLE_BUTTON)
+        self.recipient_actions_button.setToolTip("Recipient actions")
+        self.recipient_actions_menu = QMenu(self.recipient_actions_button)
+
+        self.menu_edit_action = self.recipient_actions_menu.addAction("Edit Recipient")
+        self.menu_edit_action.triggered.connect(lambda _checked=False: self.edit_selected())
+        self.menu_delete_recipient_action = self.recipient_actions_menu.addAction("Delete Recipient...")
+        self.menu_delete_recipient_action.triggered.connect(lambda _checked=False: self.delete_highlighted_recipient())
+        self.recipient_actions_menu.addSeparator()
+        self.menu_select_all_action = self.recipient_actions_menu.addAction("Select All")
+        self.menu_select_all_action.triggered.connect(lambda _checked=False: self.set_all_visible(True))
+        self.menu_clear_selection_action = self.recipient_actions_menu.addAction("Clear Selection")
+        self.menu_clear_selection_action.triggered.connect(lambda _checked=False: self.set_all_visible(False))
+        self.recipient_actions_menu.addSeparator()
+        self.menu_copy_checked_action = self.recipient_actions_menu.addAction("Copy Selected")
+        self.menu_copy_checked_action.triggered.connect(lambda _checked=False: self.copy_selected())
+        self.menu_add_checked_action = self.recipient_actions_menu.addAction("Add to Group")
+        self.menu_add_checked_action.triggered.connect(lambda _checked=False: self.assign_checked_to_group())
+        self.menu_set_groups_action = self.recipient_actions_menu.addAction("Set Groups")
+        self.menu_set_groups_action.triggered.connect(lambda _checked=False: self.batch_edit_checked())
+        self.menu_remove_checked_action = self.recipient_actions_menu.addAction("Remove from Group")
+        self.menu_remove_checked_action.triggered.connect(lambda _checked=False: self.remove_checked_from_current_group())
+        self.menu_delete_selected_action = self.recipient_actions_menu.addAction("Delete Selected...")
+        self.menu_delete_selected_action.triggered.connect(lambda _checked=False: self.delete_selected())
+        self.recipient_actions_button.setMenu(self.recipient_actions_menu)
+        workspace_heading.addWidget(self.recipient_actions_button, alignment=Qt.AlignRight | Qt.AlignVCenter)
 
         workspace = QFrame()
         workspace.setObjectName("Workspace")
@@ -786,14 +842,14 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(header)
         main_layout.addLayout(self.body_layout, stretch=1)
 
-        root = QWidget()
+        root = ResponsiveRoot()
         root.setObjectName("AppRoot")
         root.setLayout(main_layout)
         self.main_scroll_area = QScrollArea()
         self.main_scroll_area.setObjectName("MainScrollArea")
         self.main_scroll_area.setWidgetResizable(True)
         self.main_scroll_area.setFrameShape(QFrame.NoFrame)
-        self.main_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.main_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.main_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.main_scroll_area.setWidget(root)
         self.setCentralWidget(self.main_scroll_area)
@@ -943,6 +999,8 @@ class MainWindow(QMainWindow):
         self._building_table = True
         self.table.setUpdatesEnabled(False)
         self.table.blockSignals(True)
+        self.table.clearSelection()
+        self.table.setCurrentCell(-1, -1)
         self.table.setRowCount(len(indexes))
         for row, index in enumerate(indexes):
             recipient = self.recipients[index]
@@ -992,8 +1050,6 @@ class MainWindow(QMainWindow):
         self.update_brand_lockup()
         if hasattr(self, "command_bar"):
             self.arrange_command_bar()
-        if hasattr(self, "selection_layout"):
-            self.arrange_action_bar()
         if hasattr(self, "header_layout"):
             margin_x = fluid_value(width, LayoutMetrics.SPACING_LG, LayoutMetrics.HEADER_MARGIN_X)
             margin_y = fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.HEADER_MARGIN_Y)
@@ -1023,6 +1079,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "filter_bar"):
             self.filter_bar.setHorizontalSpacing(fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_LG))
             self.filter_bar.setVerticalSpacing(fluid_value(width, LayoutMetrics.SPACING_SM, LayoutMetrics.SPACING_MD))
+        if hasattr(self, "selection_layout"):
+            self.arrange_action_bar()
 
     def responsive_width(self) -> int:
         if hasattr(self, "main_scroll_area") and self.main_scroll_area.viewport().width() > 0:
@@ -1050,6 +1108,10 @@ class MainWindow(QMainWindow):
         self.command_bar.setHorizontalSpacing(fluid_value(width, LayoutMetrics.SPACING_XXS, LayoutMetrics.SPACING_XS))
         self.command_bar.setColumnMinimumWidth(3, fluid_value(width, LayoutMetrics.SPACING_XXS, LayoutMetrics.SPACING_XS))
         for key, button in self.command_buttons:
+            show_directly = width >= 620 or key in {"add", "more"}
+            button.setVisible(show_directly)
+            if not show_directly:
+                continue
             full_label, _compact_label = COMMAND_LABELS[key]
             button_width = fluid_value(
                 width,
@@ -1080,28 +1142,83 @@ class MainWindow(QMainWindow):
 
     def arrange_action_bar(self) -> None:
         available_width = self.available_workspace_width()
-        columns = 5 if available_width >= 960 else 3 if available_width >= 520 else 2
-        if self.action_bar_columns == columns and self.selection_layout.count() and self.bulk_layout.count():
+        responsive_width = self.responsive_width()
+        compact = responsive_width < 1100 or self.height() < 700
+        icon_only_actions = compact and responsive_width < 520
+        self.recipient_actions_button.setText("" if icon_only_actions else "Actions")
+        if icon_only_actions:
+            self.recipient_actions_button.setFixedWidth(self.recipient_actions_button.sizeHint().width())
+        else:
+            self.recipient_actions_button.setMinimumWidth(0)
+            self.recipient_actions_button.setMaximumWidth(LayoutMetrics.SIDEBAR_MAX_WIDTH)
+        columns = 5 if available_width >= 760 else 3 if available_width >= 520 else 2
+        layout_state = (compact, columns)
+        if self.action_bar_layout_state == layout_state and self.selection_layout.count() and self.bulk_layout.count():
+            self.compact_recipient_actions = compact
+            self.update_recipient_action_states()
             return
         clear_layout(self.selection_layout)
         clear_layout(self.bulk_layout)
         for column in range(8):
             self.selection_layout.setColumnStretch(column, 0)
             self.bulk_layout.setColumnStretch(column, 0)
-        selection_columns = 3 if columns >= 5 else 2
+            self.bulk_layout.setColumnMinimumWidth(column, 0)
+        selection_columns = 4 if not compact else 2
+        for column in range(selection_columns):
+            self.selection_layout.setColumnStretch(column, 1)
         for index, button in enumerate(self.table_action_buttons):
             self.selection_layout.addWidget(button, index // selection_columns, index % selection_columns)
         if columns >= 5:
-            self.selection_layout.setColumnStretch(3, 1)
-            self.bulk_layout.addWidget(self.bulk_count_label, 0, 0)
-            self.bulk_layout.setColumnStretch(1, 1)
+            self.bulk_layout.addWidget(self.bulk_count_label, 0, 0, 1, columns)
             for index, button in enumerate(self.bulk_action_buttons):
-                self.bulk_layout.addWidget(button, 0, index + 2)
+                self.bulk_layout.setColumnMinimumWidth(index, button.minimumSizeHint().width())
+                self.bulk_layout.addWidget(button, 1, index)
         else:
             self.bulk_layout.addWidget(self.bulk_count_label, 0, 0, 1, columns)
+            for column in range(columns):
+                self.bulk_layout.setColumnStretch(column, 1)
             for index, button in enumerate(self.bulk_action_buttons):
                 self.bulk_layout.addWidget(button, 1 + index // columns, index % columns)
         self.action_bar_columns = columns
+        self.action_bar_layout_state = layout_state
+        self.compact_recipient_actions = compact
+        self.update_recipient_action_states()
+
+    def update_recipient_action_states(self) -> None:
+        if not hasattr(self, "menu_select_all_action"):
+            return
+        visible_indexes = self.visible_indexes()
+        visible_checked = sum(1 for index in visible_indexes if self.recipients[index].get("selected"))
+        total_checked = len(self.checked_recipient_indexes())
+        has_visible = bool(visible_indexes)
+        has_highlighted = self.selected_visible_index() is not None
+        all_visible_checked = has_visible and visible_checked == len(visible_indexes)
+
+        self.select_all_button.setEnabled(has_visible and not all_visible_checked)
+        self.deselect_all_button.setEnabled(visible_checked > 0)
+        self.edit_button.setEnabled(has_highlighted)
+        self.delete_recipient_button.setEnabled(has_highlighted)
+        for button in self.bulk_action_buttons:
+            button.setEnabled(total_checked > 0)
+
+        self.menu_select_all_action.setEnabled(has_visible and not all_visible_checked)
+        self.menu_clear_selection_action.setEnabled(visible_checked > 0)
+        self.menu_edit_action.setEnabled(has_highlighted)
+        self.menu_delete_recipient_action.setEnabled(has_highlighted)
+        for action in (
+            self.menu_copy_checked_action,
+            self.menu_add_checked_action,
+            self.menu_set_groups_action,
+            self.menu_remove_checked_action,
+            self.menu_delete_selected_action,
+        ):
+            action.setEnabled(total_checked > 0)
+
+        show_action_access = has_visible or total_checked > 0
+        self.selection_actions.setVisible(show_action_access and not self.compact_recipient_actions)
+        self.recipient_actions_button.setVisible(show_action_access and self.compact_recipient_actions)
+        self.bulk_actions.setVisible(total_checked > 0)
+        self.action_bar.setVisible(total_checked > 0 and not self.compact_recipient_actions)
 
     def available_workspace_width(self) -> int:
         width = self.responsive_width()
@@ -1783,16 +1900,11 @@ class MainWindow(QMainWindow):
         group_count = len(self.scope_selection(SCOPE_GROUP).recipients)
         search_count = len(visible_indexes)
         duplicates = count_duplicate_phone_numbers(self.recipients)
-        has_visible_recipients = search_count > 0
         group_label = workspace_title(current_group)
         self.workspace_title.setText(group_label)
         self.workspace_meta.setText("1 recipient" if group_count == 1 else f"{group_count} recipients")
         self.bulk_count_label.setText(checked_status_text(total_selected))
-        self.bulk_actions.setVisible(total_selected > 0)
-        self.selection_actions.setVisible(has_visible_recipients)
-        self.action_bar.setVisible(total_selected > 0)
-        for button in self.table_action_buttons:
-            button.setEnabled(has_visible_recipients)
+        self.update_recipient_action_states()
         self.count_label.setText(
             f"Total recipients: {len(self.recipients)} | Current group ({group_label}): {group_count} | "
             f"Current search: {search_count} | Stored duplicates: {duplicates} | "
